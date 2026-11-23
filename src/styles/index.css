@@ -193,6 +193,20 @@ a {
   animation: lt-boat var(--d, 60s) linear infinite;
 }
 
+@keyframes lt-cruise {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(1900px);
+  }
+}
+
+.lt-cruise {
+  animation: lt-cruise var(--d, 90s) linear infinite;
+  animation-delay: -30s;
+}
+
 .lt-firework {
   animation: lt-firework var(--d, 6s) ease-out infinite;
   animation-delay: var(--delay, 0s);
@@ -376,4 +390,12 @@ a {
 [data-lite='true'] .lt-firework,
 [data-lite='true'] .lt-shimmer {
   animation: none;
+}
+
+/* Reduced motion: the cruise stays moored mid-river instead of crossing. */
+@media (prefers-reduced-motion: reduce) {
+  .lt-cruise {
+    animation: none;
+    transform: translateX(950px);
+  }
 }

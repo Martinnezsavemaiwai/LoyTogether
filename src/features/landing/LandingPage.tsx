@@ -59,7 +59,7 @@ export function LandingPage() {
   return (
     <main className="relative">
       <section className="relative h-[100svh] min-h-[560px] overflow-hidden">
-        <RiverScene river="wat_arun" className="absolute inset-0 h-full w-full" />
+        <RiverScene river="sut" water="full" className="absolute inset-0 h-full w-full" />
         <div aria-hidden>
           <FloatingKrathongs krathongs={scenery} interactive={false} />
         </div>
@@ -100,7 +100,7 @@ export function LandingPage() {
         />
         <div>
           <h2 className="text-3xl font-semibold leading-snug text-ink [text-wrap:balance] sm:text-4xl">
-            ลอยที่ไหน ทุกคนในสายน้ำนั้นก็เห็น
+            ลอยที่ไหนก็ได้ แต่ขออย่าลอยกับคนหลายใจ
           </h2>
           <p className="mt-5 max-w-[60ch] text-mist">
             กระทงที่คุณลอยจะไปโผล่บนจอของทุกคนที่อยู่สายน้ำเดียวกันทันที
