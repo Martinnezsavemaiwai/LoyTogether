@@ -370,6 +370,8 @@ a {
 }
 
 /* Low-power hint set by the app for small or slow devices. */
+[data-lite='true'] .lt-glow,
+[data-lite='true'] .lt-smoke,
 [data-lite='true'] .lt-firefly,
 [data-lite='true'] .lt-firework,
 [data-lite='true'] .lt-shimmer {

@@ -46,7 +46,7 @@ export function DisplayNameEditor({ className = '' }: { className?: string }) {
         <button
           type="button"
           onClick={start}
-          className="inline-flex size-10 items-center justify-center rounded-full text-mist hover:bg-ink/10 hover:text-gold"
+          className="inline-flex size-11 items-center justify-center rounded-full text-mist hover:bg-ink/10 hover:text-gold"
           aria-label="แก้ไขชื่อที่แสดง"
         >
           <Pencil className="size-4" aria-hidden />
@@ -72,12 +72,12 @@ export function DisplayNameEditor({ className = '' }: { className?: string }) {
           }}
           aria-invalid={Boolean(error)}
           aria-describedby={error ? 'display-name-error' : undefined}
-          className="h-10 w-44 rounded-full border border-ink/20 bg-night/60 px-4 text-sm text-ink focus:border-gold focus:outline-none"
+          className="h-11 w-44 rounded-full border border-ink/20 bg-night/60 px-4 text-base text-ink focus:border-gold focus:outline-none"
         />
         <button
           type="submit"
           disabled={saving}
-          className="inline-flex size-10 items-center justify-center rounded-full text-gold hover:bg-ink/10"
+          className="inline-flex size-11 items-center justify-center rounded-full text-gold hover:bg-ink/10"
           aria-label="บันทึกชื่อ"
         >
           <Check className="size-4" aria-hidden />
@@ -85,7 +85,7 @@ export function DisplayNameEditor({ className = '' }: { className?: string }) {
         <button
           type="button"
           onClick={() => setEditing(false)}
-          className="inline-flex size-10 items-center justify-center rounded-full text-mist hover:bg-ink/10"
+          className="inline-flex size-11 items-center justify-center rounded-full text-mist hover:bg-ink/10"
           aria-label="ยกเลิก"
         >
           <X className="size-4" aria-hidden />
