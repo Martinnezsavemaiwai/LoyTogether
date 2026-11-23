@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { ArrowRight, CalendarDays, MapPin, Users, Waves } from 'lucide-react';
-import { SoundToggle } from '@/components/common/SoundToggle';
+import { SongButton, useSongStore } from '@/features/music/SongDock';
 import { Wordmark } from '@/components/layout/Wordmark';
 import { RiverScene } from '@/features/festival/RiverScene';
 import { DisplayNameEditor } from '@/features/identity/DisplayNameEditor';
@@ -12,6 +12,7 @@ import { RIVERS } from './rivers';
 export function RiversPage() {
   const [stats, setStats] = useState<Record<string, number> | null>(null);
   const [presence, setPresence] = useState<Record<string, number> | null>(null);
+  const startSong = useSongStore((s) => s.start);
 
   useEffect(() => {
     let alive = true;
@@ -39,7 +40,7 @@ export function RiversPage() {
         <Wordmark />
         <div className="flex items-center gap-2">
           <DisplayNameEditor />
-          <SoundToggle />
+          <SongButton />
         </div>
       </header>
 
@@ -59,10 +60,12 @@ export function RiversPage() {
               <li key={river.id} className="lt-rise" style={{ '--delay': `${0.05 + i * 0.07}s` } as React.CSSProperties}>
                 <Link
                   to={`/river/${river.id}`}
+                  onClick={startSong}
                   className="group relative flex h-[24rem] flex-col justify-end overflow-hidden rounded-[2rem] text-ink no-underline ring-1 ring-ink/10 transition-[box-shadow,transform] duration-500 hover:-translate-y-1 hover:shadow-[0_24px_60px_-20px_rgb(245_199_106/0.35)] hover:ring-gold/50 lg:h-[28rem]"
                 >
                   <RiverScene
                     river={river.id}
+                    size="sm"
                     className="absolute inset-0 h-full w-full transition-transform duration-[1200ms] group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-night via-night/60 to-transparent" />

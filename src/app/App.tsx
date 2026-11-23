@@ -3,7 +3,7 @@ import { CreatePage } from '@/features/krathong/CreatePage';
 import { RiverPage, RoomPage } from '@/features/festival/RiverPage';
 import { RequireIdentity } from '@/features/identity/RequireIdentity';
 import { LandingPage } from '@/features/landing/LandingPage';
-import { SongDock } from '@/features/music/SongDock';
+import { SongPlayer } from '@/features/music/SongDock';
 import { JoinPage } from '@/features/rooms/JoinPage';
 import { RiversPage } from '@/features/rivers/RiversPage';
 import { NotFoundPage } from './NotFoundPage';
@@ -20,7 +20,7 @@ export function App() {
         <Route path="/join" element={<RequireIdentity><JoinPage /></RequireIdentity>} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
-      <SongDock />
+      <SongPlayer />
     </BrowserRouter>
   );
 }

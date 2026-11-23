@@ -1,66 +1,81 @@
-import { Music2, X } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { Music2, VolumeX } from 'lucide-react';
 import { create } from 'zustand';
 
 /**
- * The Loy Krathong song plays from YouTube's own embedded player, which the
- * uploader allows. YouTube's terms require the player to stay visible (at least
- * 200 x 200 px), so it is a small card rather than hidden audio. The dock lives
- * outside the routes so the song keeps playing between pages.
+ * The Loy Krathong song, played from YouTube with the player hidden (owner's decision,
+ * made knowing YouTube's terms ask for a visible player and that YouTube may refuse
+ * to play it). The iframe is created on the first user tap so the browser allows
+ * sound, then stays mounted outside the routes and is paused or resumed through the
+ * IFrame API's postMessage commands.
  */
 const VIDEO_ID = '95s3Y8nVMV4';
 
-export const useSongStore = create<{ open: boolean; setOpen: (open: boolean) => void }>((set) => ({
-  open: false,
-  setOpen: (open) => set({ open }),
+type SongState = {
+  started: boolean;
+  playing: boolean;
+  start: () => void;
+  toggle: () => void;
+};
+
+export const useSongStore = create<SongState>((set, get) => ({
+  started: false,
+  playing: false,
+  start: () => {
+    if (!get().started) set({ started: true, playing: true });
+  },
+  toggle: () => {
+    const { started, playing } = get();
+    if (!started) set({ started: true, playing: true });
+    else set({ playing: !playing });
+  },
 }));
 
 export function SongButton({ className = '' }: { className?: string }) {
-  const { open, setOpen } = useSongStore();
+  const { playing, toggle } = useSongStore();
   return (
     <button
       type="button"
-      onClick={() => setOpen(!open)}
-      aria-pressed={open}
-      aria-label={open ? 'ปิดเพลงลอยกระทง' : 'เปิดเพลงลอยกระทง'}
+      onClick={toggle}
+      aria-pressed={playing}
+      aria-label={playing ? 'ปิดเพลงลอยกระทง' : 'เปิดเพลงลอยกระทง'}
       className={`inline-flex size-12 items-center justify-center rounded-full border bg-night/50 backdrop-blur-sm transition-colors hover:border-gold/60 hover:text-gold ${
-        open ? 'border-gold/70 text-gold' : 'border-ink/15 text-ink'
+        playing ? 'border-gold/70 text-gold' : 'border-ink/15 text-ink'
       } ${className}`}
     >
-      <Music2 className="size-5" aria-hidden />
+      {playing ? <Music2 className="size-5" aria-hidden /> : <VolumeX className="size-5" aria-hidden />}
     </button>
   );
 }
 
-export function SongDock() {
-  const { open, setOpen } = useSongStore();
-  if (!open) return null;
-  const src = `https://www.youtube-nocookie.com/embed/${VIDEO_ID}?autoplay=1&loop=1&playlist=${VIDEO_ID}&playsinline=1&rel=0`;
+function sendCommand(frame: HTMLIFrameElement | null, play: boolean) {
+  frame?.contentWindow?.postMessage(
+    JSON.stringify({ event: 'command', func: play ? 'playVideo' : 'pauseVideo', args: [] }),
+    'https://www.youtube-nocookie.com',
+  );
+}
+
+export function SongPlayer() {
+  const { started, playing } = useSongStore();
+  const frame = useRef<HTMLIFrameElement>(null);
+
+  // Commands sent before the player loads are dropped, so onLoad replays the current state.
+  useEffect(() => {
+    sendCommand(frame.current, playing);
+  }, [playing]);
+
+  if (!started) return null;
+  const src = `https://www.youtube-nocookie.com/embed/${VIDEO_ID}?autoplay=1&loop=1&playlist=${VIDEO_ID}&playsinline=1&enablejsapi=1&controls=0&rel=0`;
   return (
-    <aside
-      aria-label="เพลงลอยกระทง"
-      className="lt-rise fixed left-3 top-20 z-[300] w-[13.5rem] overflow-hidden rounded-3xl border border-ink/15 bg-surface/95 shadow-[0_18px_50px_-12px_rgb(0_0_0/0.7)] backdrop-blur-md sm:left-5 sm:top-auto sm:bottom-5 sm:w-[15rem]"
-    >
-      <div className="flex items-center justify-between gap-2 px-4 py-2 text-sm">
-        <span className="inline-flex items-center gap-2 text-ink">
-          <Music2 className="size-4 text-gold" aria-hidden />
-          เพลงลอยกระทง
-        </span>
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          className="-mr-2 inline-flex size-10 items-center justify-center rounded-full text-mist hover:bg-ink/10 hover:text-ink"
-          aria-label="ปิดเพลง"
-        >
-          <X className="size-4" aria-hidden />
-        </button>
-      </div>
-      <iframe
-        title="เพลงรำวงลอยกระทง จาก YouTube"
-        src={src}
-        className="block aspect-square w-full"
-        allow="autoplay; encrypted-media; picture-in-picture"
-        referrerPolicy="strict-origin-when-cross-origin"
-      />
-    </aside>
+    <iframe
+      ref={frame}
+      title="เพลงลอยกระทง"
+      src={src}
+      aria-hidden="true"
+      tabIndex={-1}
+      allow="autoplay; encrypted-media"
+      onLoad={() => window.setTimeout(() => sendCommand(frame.current, useSongStore.getState().playing), 800)}
+      className="pointer-events-none fixed -left-[2px] -top-[2px] size-px opacity-0"
+    />
   );
 }
