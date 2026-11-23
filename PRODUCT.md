@@ -31,7 +31,7 @@ A shared, live river: krathongs from everyone in the same river appear on every 
 ## Capabilities and Constraints
 
 - Launch scope (owner chose to ship everything before launch): landing, guest identity, six venues, SVG krathong builder with 5 parts, wishes with public/private visibility, realtime floating and presence, private and couple rooms with hashed invite tokens, Couple Moment, ambient water sound, the Loy Krathong song via an embedded YouTube player.
-- Deferred: memory card.
+- Memory card (added 23 Nov 2026): a 1080x1350 JPEG drawn in the browser after floating, with the venue, the krathong, its name, the display name, date and the public wish only. Shared with the Web Share API where the phone supports files, otherwise saved.
 - Wishes: max 280 characters, private by default. Private wishes must never reach other users through queries or Realtime.
 - Moderation (owner decision): profanity filter in client and database with normalization against spacing, repeats and look-alike letters, plus a report action; a public wish reported 3 times is hidden automatically.
 - Supabase free tier limits (about 200 concurrent Realtime connections; project pauses after 7 idle days). The client falls back to periodic refetch when Realtime is unavailable.
