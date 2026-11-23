@@ -16,10 +16,10 @@ const KINDS: { value: Kind; label: string; hint: string; Icon: typeof Heart }[] 
   { value: 'private', label: 'ห้องเพื่อน', hint: 'ชวนได้สูงสุด 30 คน', Icon: Users },
 ];
 
-export function CreateRoomPanel() {
+export function CreateRoomPanel({ onCreated }: { onCreated?: () => void } = {}) {
   const navigate = useNavigate();
   const [kind, setKind] = useState<Kind>('couple');
-  const [riverId, setRiverId] = useState<RiverId>('wat_arun');
+  const [riverId, setRiverId] = useState<RiverId>('sut');
   const [title, setTitle] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -43,8 +43,11 @@ export function CreateRoomPanel() {
       const result = await backend.createPrivateRoom(riverId, kind, value);
       saveInvite(result.room.id, result.inviteToken);
       setCreated(result);
+      onCreated?.();
     } catch (err) {
-      setError(errorMessage(err));
+      // Rooms have only a daily limit, so the generic "slow down" text would mislead here.
+      const code = (err as { code?: string })?.code;
+      setError(code === 'rate_limited' ? 'วันนี้เปิดห้องครบ 5 ห้องแล้ว ลองใหม่พรุ่งนี้นะ' : errorMessage(err));
     } finally {
       setBusy(false);
     }
@@ -71,26 +74,50 @@ export function CreateRoomPanel() {
     return (
       <div className="rounded-[2rem] border border-gold/30 bg-surface p-6 sm:p-8">
         <h3 className="text-2xl font-semibold">เปิดห้อง “{created.room.title}” แล้ว</h3>
-        <p className="mt-2 max-w-[56ch] text-mist">
-          ส่งลิงก์นี้ให้คนที่อยากชวน ใครมีลิงก์ก็เข้าห้องได้ ห้องจะปิดเองใน 3 วัน
-          {created.room.roomType === 'couple' ? ' ห้องคู่รับได้แค่ 2 คนรวมคุณ' : ''}
+        <ol className="mt-4 space-y-2 text-ink">
+          <li>
+            <span className="text-gold">1.</span> กดคัดลอกลิงก์ชวน แล้วส่งให้คนที่อยากชวนทาง LINE หรือแชตไหนก็ได้
+          </li>
+          <li>
+            <span className="text-gold">2.</span> เขากดลิงก์ก็เข้ามาลอยในห้องนี้ได้เลย ไม่ต้องสมัคร
+          </li>
+          <li>
+            <span className="text-gold">3.</span> กระทงในห้องนี้เห็นกันเฉพาะคนในห้อง
+          </li>
+        </ol>
+        <p className="mt-3 text-sm text-mist">
+          {created.room.roomType === 'couple' ? 'ห้องคู่รับได้ 2 คนรวมคุณ ' : 'ห้องเพื่อนรับได้ 30 คน '}
+          ห้องปิดเองใน 3 วัน ลิงก์นี้หาได้อีกที่หัวข้อห้องของคุณ
         </p>
-        <p className="mt-4 break-all rounded-2xl bg-night/60 px-4 py-3 font-mono text-sm text-ink select-all">{url}</p>
+        <p className="mt-3 truncate rounded-xl bg-night/60 px-3 py-2 font-mono text-xs text-mist select-all" title={url}>
+          {url}
+        </p>
         <div className="mt-5 flex flex-wrap gap-3">
           <Button onClick={copy}>
             {copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />}
-            {copied ? 'คัดลอกแล้ว' : 'คัดลอกลิงก์'}
+            {copied ? 'คัดลอกแล้ว' : 'คัดลอกลิงก์ชวน'}
           </Button>
           {'share' in navigator && (
             <Button variant="ghost" onClick={share}>
               <Share2 className="size-4" aria-hidden />
-              แชร์
+              ส่งให้เพื่อน
             </Button>
           )}
           <Button variant="ghost" onClick={() => navigate(`/room/${created.room.id}`)}>
             เข้าห้อง
           </Button>
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            setCreated(null);
+            setTitle('');
+            setError(null);
+          }}
+          className="mt-4 inline-flex min-h-11 items-center text-sm text-mist underline-offset-4 hover:text-ink hover:underline"
+        >
+          เปิดห้องอื่นอีก
+        </button>
         {error && <p className="mt-3 text-sm text-danger">{error}</p>}
       </div>
     );

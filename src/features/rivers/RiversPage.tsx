@@ -6,6 +6,7 @@ import { Wordmark } from '@/components/layout/Wordmark';
 import { RiverScene } from '@/features/festival/RiverScene';
 import { DisplayNameEditor } from '@/features/identity/DisplayNameEditor';
 import { CreateRoomPanel } from '@/features/rooms/CreateRoomPanel';
+import { MyRooms } from '@/features/rooms/MyRooms';
 import { backend } from '@/lib/backend';
 import { RIVERS } from './rivers';
 
@@ -13,6 +14,7 @@ export function RiversPage() {
   const [stats, setStats] = useState<Record<string, number> | null>(null);
   const [presence, setPresence] = useState<Record<string, number> | null>(null);
   const startSong = useSongStore((s) => s.start);
+  const [roomsVersion, setRoomsVersion] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -39,6 +41,12 @@ export function RiversPage() {
       <header className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-8">
         <Wordmark />
         <div className="flex items-center gap-2">
+          <a
+            href="#rooms"
+            className="hidden min-h-11 items-center rounded-full px-3 text-sm text-mist no-underline hover:text-gold sm:inline-flex"
+          >
+            ห้องส่วนตัว
+          </a>
           <DisplayNameEditor />
           <SongButton />
         </div>
@@ -51,6 +59,9 @@ export function RiversPage() {
         <p className="mt-3 max-w-[60ch] text-mist">
           ทุกที่จำลองมาจากสถานที่ที่มีงานลอยกระทงจริงปีนี้ คนที่เลือกที่เดียวกันจะเห็นกระทงของกันและกัน
         </p>
+        <a href="#rooms" className="mt-3 inline-flex min-h-11 items-center text-sm text-gold underline-offset-4 hover:underline">
+          อยากลอยกับคนกันเอง เปิดห้องส่วนตัวหรือดูห้องของคุณ
+        </a>
 
         <ul className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3" data-lite="true">
           {RIVERS.map((river, i) => {
@@ -112,8 +123,9 @@ export function RiversPage() {
         </p>
       </section>
 
-      <section className="mx-auto max-w-6xl px-5 pb-20 sm:px-8">
-        <CreateRoomPanel />
+      <section id="rooms" className="mx-auto max-w-6xl scroll-mt-6 px-5 pb-20 sm:px-8">
+        <MyRooms refreshKey={roomsVersion} />
+        <CreateRoomPanel onCreated={() => setRoomsVersion((v) => v + 1)} />
       </section>
     </main>
   );
