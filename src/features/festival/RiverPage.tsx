@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import { ArrowLeft, Check, Heart, Link2, Lock, Plus, Users, Waves } from 'lucide-react';
-import { SoundToggle } from '@/components/common/SoundToggle';
 import { Button } from '@/components/ui/Button';
 import { SongButton } from '@/features/music/SongDock';
 import { getRiver, type River } from '@/features/rivers/rivers';
@@ -10,6 +9,7 @@ import { useRoom } from '@/hooks/useRoom';
 import { backend, errorMessage } from '@/lib/backend';
 import { useIdentityStore } from '@/stores/identityStore';
 import type { Krathong, Room } from '@/types/domain';
+import { PaySheet } from '@/features/tips/PaySheet';
 import { FloatingKrathongs } from './FloatingKrathongs';
 import { KrathongDetails } from './KrathongDetails';
 import { RiverScene } from './RiverScene';
@@ -135,7 +135,17 @@ function FestivalView({ roomId, river, room }: { roomId: string; river: River; r
   const [justFloated] = useState<Krathong | null>(
     () => (location.state as { justFloated?: Krathong } | null)?.justFloated ?? null,
   );
+  const [tip, setTip] = useState<number | null>(
+    () => (location.state as { tip?: number | null } | null)?.tip ?? null,
+  );
   const [toast, setToast] = useState<string | null>(justFloated ? 'กระทงของคุณลอยไปแล้ว' : null);
+  // Let the visitor watch their krathong reach the water before the QR slides up.
+  const [payReady, setPayReady] = useState(false);
+  useEffect(() => {
+    if (tip === null) return;
+    const t = window.setTimeout(() => setPayReady(true), 2500);
+    return () => window.clearTimeout(t);
+  }, [tip]);
   const { addLocal, removeLocal } = live;
 
   // Show our own krathong right away, before Realtime echoes it back.
@@ -223,7 +233,6 @@ function FestivalView({ roomId, river, room }: { roomId: string; river: River; r
         <div className="flex shrink-0 gap-2">
           {room && <InviteButton roomId={room.id} />}
           <SongButton />
-          <SoundToggle />
         </div>
       </header>
 
@@ -274,6 +283,8 @@ function FestivalView({ roomId, river, room }: { roomId: string; river: River; r
           {toast}
         </p>
       )}
+
+      {tip !== null && payReady && !selected && <PaySheet amount={tip} onClose={() => setTip(null)} />}
 
       {selected && (
         <KrathongDetails
