@@ -64,30 +64,27 @@ npm run build
 
    แอปโหลด Turnstile เฉพาะตอนสร้างแขกใหม่ คนส่วนใหญ่จะไม่เห็นอะไรเลย กล่องยืนยันจะโผล่ที่ขอบล่างของจอเฉพาะตอนที่ Cloudflare ขอให้กด
 
-## Deploy ขึ้น Cloudflare Pages
+## Deploy ขึ้น Cloudflare
 
-ต้อง push โค้ดขึ้น GitHub ก่อน (`https://github.com/Martinnezsavemaiwai/LoyTogether`)
+เว็บนี้เป็นไฟล์ static ล้วน deploy เป็น Worker ที่เสิร์ฟไฟล์ใน `dist` ตามที่ตั้งไว้ใน `wrangler.jsonc`
+(`not_found_handling: single-page-application` ส่งทุก path ที่ไม่มีไฟล์ไปที่ `index.html` เปิด `/river/wat_arun` หรือ `/join#t=...` ตรงๆ จึงไม่ขึ้น 404)
 
-1. เข้า [dash.cloudflare.com](https://dash.cloudflare.com) > Workers & Pages > Create
-2. เลือกแท็บ **Pages** > **Connect to Git** (ถ้าหน้าแรกพาไปสร้าง Worker ให้หาลิงก์ที่เขียนว่า Pages)
-3. อนุญาตให้ Cloudflare เข้าถึง GitHub แล้วเลือก repo `LoyTogether`
-4. ตั้งค่า build
-   - Production branch: `main`
-   - Framework preset: `React (Vite)` หรือ `None`
+1. เข้า [dash.cloudflare.com](https://dash.cloudflare.com) > Workers & Pages > Create > Import a repository แล้วเลือก `LoyTogether`
+2. ตั้งค่า
    - Build command: `npm run build`
-   - Build output directory: `dist`
-5. Environment variables (Production และ Preview)
+   - Deploy command: `npx wrangler deploy`
+   - Path: `/`
+3. Advanced settings > Variables ใส่ตัวแปรตอน build (ใส่ทีละตัว)
+   - `NODE_VERSION` = `22`
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
-   - `NODE_VERSION` = `22`
    - `VITE_TURNSTILE_SITE_KEY` (ถ้าเปิด CAPTCHA)
    - `VITE_PROMPTPAY_ID` และ `VITE_PROMPTPAY_NAME` (ถ้าอยากเปิดให้ใส่เงิน)
 
-   ค่า `VITE_` ถูกฝังตอน build ถ้าแก้ทีหลังต้องกด Retry deployment ใหม่
-6. กด Save and Deploy รอ build เสร็จจะได้ URL แบบ `https://<ชื่อโปรเจกต์>.pages.dev`
-7. ทุกครั้งที่ push เข้า `main` Cloudflare จะ build และ deploy ใหม่ให้เอง
+   ค่า `VITE_` ถูกฝังตอน build ถ้าลืมใส่หรือแก้ทีหลัง ไปที่ Settings > Build > Variables แล้วสั่ง build ใหม่ ถ้าเว็บขึ้นแถบโหมดทดลอง แปลว่า build ไม่เห็น `VITE_SUPABASE_URL`
+4. กด Deploy จะได้ URL แบบ `https://loytogether.<บัญชี>.workers.dev`
+5. ทุกครั้งที่ push เข้า `main` Cloudflare จะ build และ deploy ใหม่ให้เอง
 
-`public/_redirects` ส่งทุก path ไปที่ `index.html` อยู่แล้ว เปิด `/river/wat_arun` หรือ `/join#t=...` ตรงๆ จึงไม่ขึ้น 404
 หลังได้ URL แล้ว ให้ไปใส่ใน Supabase ที่ Authentication > URL Configuration > Site URL ด้วย
 
 ## โครงสร้าง

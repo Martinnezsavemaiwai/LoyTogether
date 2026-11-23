@@ -1,0 +1,11 @@
+{
+  // Static site on Cloudflare Workers: no server code, just the Vite build in dist.
+  // not_found_handling serves index.html for unknown paths, so /river/wat_arun and
+  // /join#t=... load the app instead of a 404 (this replaces public/_redirects).
+  "name": "loytogether",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}
