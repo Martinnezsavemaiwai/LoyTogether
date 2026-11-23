@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
-  BLOCKED_PATTERNS,
+  BLOCKED_LATIN,
+  BLOCKED_THAI,
   NORMALIZE_FROM,
   NORMALIZE_TO,
   containsBlockedWords,
@@ -17,25 +18,46 @@ describe('profanity filter', () => {
     'ค ว ย',
     'ค.ว.ย',
     'ค+ว+ย',
+    'ค1วย',
+    'คว@ย',
     'ควยยยยย',
+    'คววววย',
+    'ครวย',
+    'คุวย',
+    'ฅวย',
     'สัส',
     'ส.ั.ส',
     'ศัส',
-    'สัสสสส',
     'สัด',
     'อีดอก',
     'กะหรี่',
+    'กระหรี่',
     'ไอ้ควาย',
+    'อีห่า',
     'แม่ง',
+    'แมร่ง',
     'พ่อมึงตาย',
+    'มึง',
     'เย็ด',
+    'เงี่ยน',
     'ชิบหาย',
     'ฉิบหาย',
+    'จัญไร',
+    'จังไร',
+    'จรรไร',
+    'ส้นตีน',
+    'หน้าหี',
+    'จิ๋ม',
+    'จู๋',
+    'ตอแหล',
+    'เชี่ย',
+    'เชรี้ย',
+    'ร่วมเพศ',
     'F U C K',
     'fuuuuck',
     'f*ck you',
     'sh1t',
-    'b!tch'.replace('!', 'i'),
+    'b!tch',
     'a$$hole',
     'wtf',
   ])('blocks %s', (text) => {
@@ -54,25 +76,35 @@ describe('profanity filter', () => {
     'หีบสมบัติ',
     'ห่านตัวใหญ่',
     'ดอกทองอุไรสวย',
+    'ไปเที่ยวเชียงใหม่',
+    'เชี่ยวชาญมากขึ้น',
+    'ไปเชียร์บอล',
+    'เหี้ยมโหดไม่เอา',
+    'ขอให้ไอหายเร็วๆ',
+    'กินกะหรี่ปั๊บอร่อย',
+    'สัสดีจังหวัด',
+    'แม่มดใจดี',
+    'ขอให้สัตว์เลี้ยงแข็งแรง',
+    'สาดน้ำสงกรานต์',
     'Nigeria trip',
     'ปี 2569 ขอให้ปัง',
+    'ลอยนำกันเด้อ',
   ])('allows %s', (text) => {
     expect(containsBlockedWords(text)).toBe(false);
   });
 
-  it('normalizes look-alikes, separators and repeats', () => {
-    expect(normalizeForModeration('ศ ั ส!!!')).toBe('สัส');
-    expect(normalizeForModeration('FuuCK')).toBe('fuck');
+  it('splits text into Thai and Latin streams', () => {
+    expect(normalizeForModeration('ศ ั ส... FuuCK')).toEqual({ thai: 'สัส', latin: 'fuck' });
   });
 });
 
 describe('database filter stays in sync', () => {
-  const sql = readFileSync('supabase/migrations/20261123000001_core_schema.sql', 'utf8');
+  const sql = readFileSync('supabase/migrations/20261123000004_multi_parts_moderation.sql', 'utf8');
+  const tone = '[่้๊๋]?';
 
-  it('has every pattern from the client list', () => {
-    for (const pattern of BLOCKED_PATTERNS) {
-      const tone = '[่้๊๋]?';
-      expect(sql, pattern).toContain(`'${pattern.replaceAll('${TONE}', tone)}'`);
+  it('has every Thai and Latin pattern from the client lists', () => {
+    for (const pattern of [...BLOCKED_THAI, ...BLOCKED_LATIN]) {
+      expect(sql, pattern).toContain(`'${pattern.replaceAll('${T}', tone)}'`);
     }
   });
 

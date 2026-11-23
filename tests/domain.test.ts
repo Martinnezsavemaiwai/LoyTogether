@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DESIGN, isValidDesign, normalizeDesign } from '@/features/krathong/options';
+import { DEFAULT_DESIGN, flowerPhases, isValidDesign, normalizeDesign } from '@/features/krathong/options';
 import { RIVERS, getRiver, riverByRoomId } from '@/features/rivers/rivers';
 import {
   crossingProgress,
@@ -38,18 +38,36 @@ describe('krathong customization', () => {
     expect(isValidDesign(DEFAULT_DESIGN)).toBe(true);
   });
 
-  it('rejects unknown values and extra keys', () => {
+  it('rejects unknown values, extra keys and too many flowers', () => {
     expect(isValidDesign({ ...DEFAULT_DESIGN, candle: 'neon' })).toBe(false);
     expect(isValidDesign({ ...DEFAULT_DESIGN, extra: 'x' })).toBe(false);
+    expect(isValidDesign({ ...DEFAULT_DESIGN, flowers: ['rose', 'rose'] })).toBe(false);
+    expect(isValidDesign({ ...DEFAULT_DESIGN, flowers: ['rose', 'lotus', 'orchid', 'jasmine'] })).toBe(false);
     expect(isValidDesign(null)).toBe(false);
     expect(isValidDesign([])).toBe(false);
   });
 
+  it('accepts a krathong with nothing on the plate', () => {
+    expect(
+      isValidDesign({ ...DEFAULT_DESIGN, flowers: [], candle: null, incense: false, beads: null, garland: false }),
+    ).toBe(true);
+  });
+
   it('normalizes broken designs field by field', () => {
-    expect(normalizeDesign({ shape: 'heart', candle: 'neon' })).toEqual({
-      ...DEFAULT_DESIGN,
-      shape: 'heart',
-    });
+    expect(normalizeDesign({ shape: 'heart', candle: 'neon' })).toEqual({ ...DEFAULT_DESIGN, shape: 'heart' });
+  });
+
+  it('reads the older single-choice design', () => {
+    expect(
+      normalizeDesign({ shape: 'circle', base: 'flower', flower: 'rose', candle: 'red', decoration: 'jasmine_garland' }),
+    ).toEqual({ ...DEFAULT_DESIGN, shape: 'circle', base: 'flower', flowers: ['rose'], candle: 'red', beads: null, garland: true });
+  });
+
+  it('splits ring slots between up to three flower kinds', () => {
+    expect(flowerPhases([])).toEqual([]);
+    expect(flowerPhases(['rose']).map((p) => p.phase)).toEqual([0, 1, 2]);
+    expect(flowerPhases(['rose', 'lotus']).map((p) => p.kind)).toEqual(['rose', 'lotus', 'rose']);
+    expect(flowerPhases(['rose', 'lotus', 'jasmine']).map((p) => p.kind)).toEqual(['rose', 'lotus', 'jasmine']);
   });
 });
 

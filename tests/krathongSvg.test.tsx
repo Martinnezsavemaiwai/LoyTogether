@@ -14,10 +14,16 @@ describe('KrathongSvg', () => {
       { shape: 'heart' },
       { shape: 'circle' },
       { base: 'flower' },
-      { flower: 'rose' },
-      { flower: 'orchid' },
+      { flowers: ['rose'] },
+      { flowers: ['orchid', 'lotus'] },
+      { flowers: [] },
       { candle: 'pink' },
-      { decoration: 'purple' },
+      { candle: null },
+      { incense: false },
+      { beads: 'purple' },
+      { beads: null },
+      { garland: true },
+      { coins: true },
     ];
     for (const change of variants) {
       expect(markup({ ...DEFAULT_DESIGN, ...change }), JSON.stringify(change)).not.toBe(base);
