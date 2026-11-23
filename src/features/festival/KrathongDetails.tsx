@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Flag, Lock, X } from 'lucide-react';
+import { Flag, ImageIcon, Lock, X } from 'lucide-react';
 import { KrathongArt } from '@/features/krathong/KrathongArt';
 import { backend, errorMessage } from '@/lib/backend';
 import type { Krathong } from '@/types/domain';
@@ -9,6 +9,8 @@ interface Props {
   isMine: boolean;
   onClose: () => void;
   onReported: (id: string) => void;
+  /** Own krathong only: open its memory card. */
+  onMemoryCard?: (krathong: Krathong) => void;
 }
 
 function timeAgo(iso: string): string {
@@ -21,7 +23,7 @@ function timeAgo(iso: string): string {
 }
 
 /** Non-modal panel: the river keeps moving behind it. */
-export function KrathongDetails({ krathong, isMine, onClose, onReported }: Props) {
+export function KrathongDetails({ krathong, isMine, onClose, onReported, onMemoryCard }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const [myWish, setMyWish] = useState<string | null>(null);
   const [reportState, setReportState] = useState<'idle' | 'confirm' | 'sending' | 'done'>('idle');
@@ -58,7 +60,8 @@ export function KrathongDetails({ krathong, isMine, onClose, onReported }: Props
       setReportState('done');
       onReported(krathong.id);
     } catch (err) {
-      setError(errorMessage(err));
+      const code = (err as { code?: string })?.code;
+      setError(code === 'rate_limited' ? 'วันนี้คุณรายงานไปเยอะแล้ว ขอบคุณที่ช่วยดูแลนะ' : errorMessage(err));
       setReportState('idle');
     }
   };
@@ -118,6 +121,17 @@ export function KrathongDetails({ krathong, isMine, onClose, onReported }: Props
       </div>
 
       <div className="mt-5">{wishBlock}</div>
+
+      {isMine && onMemoryCard && (
+        <button
+          type="button"
+          onClick={() => onMemoryCard(krathong)}
+          className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-full border border-gold/40 px-4 text-sm text-gold hover:bg-gold/10"
+        >
+          <ImageIcon className="size-4" aria-hidden />
+          ทำการ์ดความทรงจำ
+        </button>
+      )}
 
       {!isMine && krathong.publicWish && (
         <div className="mt-6 border-t border-ink/10 pt-4 text-sm">

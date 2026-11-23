@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import { ArrowLeft, Check, Heart, Link2, Lock, Plus, Users, Waves } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -9,10 +9,19 @@ import { useRoom } from '@/hooks/useRoom';
 import { backend, errorMessage } from '@/lib/backend';
 import { useIdentityStore } from '@/stores/identityStore';
 import type { Krathong, Room } from '@/types/domain';
-import { PaySheet } from '@/features/tips/PaySheet';
 import { FloatingKrathongs } from './FloatingKrathongs';
 import { KrathongDetails } from './KrathongDetails';
 import { RiverScene } from './RiverScene';
+
+import { MemoryPrompt } from '@/features/memory/MemoryPrompt';
+import { PROMPTPAY_ID } from '@/lib/promptpay';
+import { SupportPrompt } from '@/features/tips/SupportPrompt';
+import { shouldAskForSupport } from '@/features/tips/supportSession';
+
+const PaySheet = lazy(() => import('@/features/tips/PaySheet').then((m) => ({ default: m.PaySheet })));
+const MemoryCardSheet = lazy(() =>
+  import('@/features/memory/MemoryCardSheet').then((m) => ({ default: m.MemoryCardSheet })),
+);
 
 const STATUS_LABEL = {
   connecting: 'กำลังเชื่อมต่อ',
@@ -135,17 +144,23 @@ function FestivalView({ roomId, river, room }: { roomId: string; river: River; r
   const [justFloated] = useState<Krathong | null>(
     () => (location.state as { justFloated?: Krathong } | null)?.justFloated ?? null,
   );
-  const [tip, setTip] = useState<number | null>(
-    () => (location.state as { tip?: number | null } | null)?.tip ?? null,
-  );
   const [toast, setToast] = useState<string | null>(justFloated ? 'กระทงของคุณลอยไปแล้ว' : null);
-  // Let the visitor watch their krathong reach the water before the QR slides up.
-  const [payReady, setPayReady] = useState(false);
+  // After floating, one thing at a time: first the offer of a memory card, then, only
+  // once per session and only if the owner set up PromptPay, the ask to chip in.
+  const [after, setAfter] = useState<'none' | 'memory' | 'support' | 'paying'>('none');
+  const [cardFor, setCardFor] = useState<Krathong | null>(null);
   useEffect(() => {
-    if (tip === null) return;
-    const t = window.setTimeout(() => setPayReady(true), 2500);
+    if (!justFloated) return;
+    const t = window.setTimeout(() => setAfter('memory'), 2500);
     return () => window.clearTimeout(t);
-  }, [tip]);
+  }, [justFloated]);
+  const afterMemory = useCallback(() => {
+    setAfter(PROMPTPAY_ID && shouldAskForSupport() ? 'support' : 'none');
+  }, []);
+  const closeCard = useCallback(() => {
+    setCardFor(null);
+    if (after === 'memory') afterMemory();
+  }, [after, afterMemory]);
   const { addLocal, removeLocal } = live;
 
   // Show our own krathong right away, before Realtime echoes it back.
@@ -185,7 +200,7 @@ function FestivalView({ roomId, river, room }: { roomId: string; river: River; r
 
   return (
     <main className="relative h-[100svh] min-h-[520px] overflow-hidden" data-lite={lite}>
-      <RiverScene river={river.id} className="absolute inset-0 h-full w-full" />
+      <RiverScene river={river.id} water={lite ? 'lite' : 'full'} className="absolute inset-0 h-full w-full" />
       <FloatingKrathongs
         krathongs={visible}
         myId={identity?.userId}
@@ -284,7 +299,22 @@ function FestivalView({ roomId, river, room }: { roomId: string; river: River; r
         </p>
       )}
 
-      {tip !== null && payReady && !selected && <PaySheet amount={tip} onClose={() => setTip(null)} />}
+      {after === 'memory' && justFloated && !selected && !cardFor && (
+        <MemoryPrompt onAccept={() => setCardFor(justFloated)} onDismiss={afterMemory} />
+      )}
+      {cardFor && (
+        <Suspense fallback={null}>
+          <MemoryCardSheet krathong={cardFor} river={river} placeTitle={room?.title} onClose={closeCard} />
+        </Suspense>
+      )}
+      {after === 'support' && !selected && !cardFor && (
+        <SupportPrompt onAccept={() => setAfter('paying')} onDismiss={() => setAfter('none')} />
+      )}
+      {after === 'paying' && !selected && (
+        <Suspense fallback={null}>
+          <PaySheet onClose={() => setAfter('none')} />
+        </Suspense>
+      )}
 
       {selected && (
         <KrathongDetails
@@ -293,6 +323,10 @@ function FestivalView({ roomId, river, room }: { roomId: string; river: River; r
           isMine={selected.ownerId === identity?.userId}
           onClose={closeDetails}
           onReported={onReported}
+          onMemoryCard={(k) => {
+            setSelected(null);
+            setCardFor(k);
+          }}
         />
       )}
     </main>
