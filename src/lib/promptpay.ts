@@ -53,5 +53,5 @@ const configuredId = (import.meta.env.VITE_PROMPTPAY_ID as string | undefined) ?
 export const PROMPTPAY_ID: string | null = promptPayTarget(configuredId) ? configuredId : null;
 export const PROMPTPAY_NAME = ((import.meta.env.VITE_PROMPTPAY_NAME as string | undefined) ?? '').trim();
 
-export const TIP_PRESETS = [9, 19, 39, 59, 99];
-export const TIP_MAX = 10000;
+/** Upper bound for the symbolic amount typed into the krathong builder. */
+export const COIN_MAX = 99999;

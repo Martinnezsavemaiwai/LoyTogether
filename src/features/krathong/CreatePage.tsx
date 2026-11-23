@@ -19,7 +19,7 @@ import { useIdentityStore } from '@/stores/identityStore';
 import { KrathongArt } from './KrathongArt';
 import { BASES, BEADS, CANDLES, FLOWERS, SHAPES } from './options';
 import { ChoicePicker, FlowerPicker, SwitchRow } from './PartPickers';
-import { TipPicker } from '@/features/tips/TipPicker';
+import { CoinPicker } from '@/features/tips/CoinPicker';
 
 export function CreatePage() {
   const [params] = useSearchParams();
@@ -97,11 +97,10 @@ export function CreatePage() {
         wish: wish.value,
         visibility: draft.visibility,
       });
-      const tip = draft.tip;
       draft.clear();
       draft.setPart('coins', false);
       attemptId.current = crypto.randomUUID();
-      navigate(backHref, { state: { justFloated: krathong, tip } });
+      navigate(backHref, { state: { justFloated: krathong } });
     } catch (err) {
       setErrors({ submit: errorMessage(err) });
       setSubmitting(false);
@@ -115,7 +114,7 @@ export function CreatePage() {
         aria-label="ตัวอย่างกระทง"
         className="sticky top-0 z-10 h-[42svh] overflow-hidden border-b border-ink/10 lg:h-[100svh] lg:border-b-0"
       >
-        <RiverScene river={river.id} className="absolute inset-0 h-full w-full" />
+        <RiverScene river={river.id} water="lite" className="absolute inset-0 h-full w-full" />
         <div className="absolute inset-x-0 top-0 flex items-center justify-between p-3 sm:p-5">
           <Link
             to={backHref}
@@ -161,11 +160,11 @@ export function CreatePage() {
             <SwitchRow label="ธูป 3 ดอก" checked={draft.design.incense} onChange={(v) => draft.setPart('incense', v)} />
             <SwitchRow label="มาลัยมะลิ" hint="ร้อยรอบขอบ มีดอกกุหลาบห้อยด้านหน้า" checked={draft.design.garland} onChange={(v) => draft.setPart('garland', v)} />
           </div>
-          <TipPicker
-            value={draft.tip}
-            onChange={(tip) => {
-              draft.setField({ tip });
-              draft.setPart('coins', tip !== null);
+          <CoinPicker
+            value={draft.coinAmount}
+            onChange={(coinAmount) => {
+              draft.setField({ coinAmount });
+              draft.setPart('coins', coinAmount !== null);
             }}
           />
         </div>

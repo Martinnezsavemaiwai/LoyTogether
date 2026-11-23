@@ -8,11 +8,11 @@ type DraftState = {
   krathongName: string;
   wish: string;
   visibility: WishVisibility;
-  /** Baht the visitor chose to put in; never stored on the server. */
-  tip: number | null;
+  /** Money put in the krathong for show: null none, 0 coins without an amount. Never paid or stored. */
+  coinAmount: number | null;
   setPart: <K extends keyof KrathongDesign>(key: K, value: KrathongDesign[K]) => void;
   toggleFlower: (kind: KrathongFlower) => void;
-  setField: (patch: Partial<Pick<DraftState, 'krathongName' | 'wish' | 'visibility' | 'tip'>>) => void;
+  setField: (patch: Partial<Pick<DraftState, 'krathongName' | 'wish' | 'visibility' | 'coinAmount'>>) => void;
   resetDesign: () => void;
   clear: () => void;
 };
@@ -25,7 +25,7 @@ export const useDraftStore = create<DraftState>()(
       krathongName: '',
       wish: '',
       visibility: 'private',
-      tip: null,
+      coinAmount: null,
       setPart: (key, value) => set((s) => ({ design: { ...s.design, [key]: value } })),
       toggleFlower: (kind) =>
         set((s) => {
@@ -35,8 +35,8 @@ export const useDraftStore = create<DraftState>()(
           return { design: { ...s.design, flowers } };
         }),
       setField: (patch) => set(patch),
-      resetDesign: () => set((s) => ({ design: { ...DEFAULT_DESIGN, coins: s.tip !== null } })),
-      clear: () => set({ krathongName: '', wish: '', visibility: 'private', tip: null }),
+      resetDesign: () => set((s) => ({ design: { ...DEFAULT_DESIGN, coins: s.coinAmount !== null } })),
+      clear: () => set({ krathongName: '', wish: '', visibility: 'private', coinAmount: null }),
     }),
     {
       name: 'loynamkan:draft',
@@ -45,10 +45,10 @@ export const useDraftStore = create<DraftState>()(
         return {
           ...current,
           ...p,
-          // tip is not restored, so coins never survive a reload on their own
+          // coins are not restored, so they never survive a reload on their own
           design: { ...normalizeDesign(p.design), coins: false },
           visibility: p.visibility === 'public' ? 'public' : 'private',
-          tip: null,
+          coinAmount: null,
         };
       },
     },

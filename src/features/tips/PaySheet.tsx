@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Download, X } from 'lucide-react';
-import QRCode from 'qrcode';
 import { Button } from '@/components/ui/Button';
 import { PROMPTPAY_ID, PROMPTPAY_NAME, promptPayPayload } from '@/lib/promptpay';
 
-/** PromptPay QR for the amount the visitor chose. Payment happens in their banking app. */
-export function PaySheet({ amount, onClose }: { amount: number; onClose: () => void }) {
-  const payload = useMemo(() => (PROMPTPAY_ID ? promptPayPayload(PROMPTPAY_ID, amount) : null), [amount]);
+/**
+ * PromptPay QR with no amount set: the payer types whatever they like in their banking
+ * app. Payment happens there; the site cannot see whether it did.
+ */
+export function PaySheet({ onClose }: { onClose: () => void }) {
+  const payload = useMemo(() => (PROMPTPAY_ID ? promptPayPayload(PROMPTPAY_ID) : null), []);
   const [src, setSrc] = useState<string | null>(null);
   const [renderFailed, setRenderFailed] = useState(false);
   const failed = !payload || renderFailed;
@@ -18,9 +20,21 @@ export function PaySheet({ amount, onClose }: { amount: number; onClose: () => v
 
   useEffect(() => {
     if (!payload) return;
-    QRCode.toDataURL(payload, { width: 560, margin: 2, errorCorrectionLevel: 'M', color: { dark: '#0b1229', light: '#ffffff' } })
-      .then(setSrc)
-      .catch(() => setRenderFailed(true));
+    let cancelled = false;
+    // qrcode is only needed by the few visitors who open this sheet, so it loads on demand.
+    import('qrcode')
+      .then(({ default: QRCode }) =>
+        QRCode.toDataURL(payload, { width: 560, margin: 2, errorCorrectionLevel: 'M', color: { dark: '#0b1229', light: '#ffffff' } }),
+      )
+      .then((url) => {
+        if (!cancelled) setSrc(url);
+      })
+      .catch(() => {
+        if (!cancelled) setRenderFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [payload]);
 
   useEffect(() => {
@@ -41,9 +55,9 @@ export function PaySheet({ amount, onClose }: { amount: number; onClose: () => v
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 id="pay-title" className="text-xl font-semibold">
-            ใส่เงิน {amount.toLocaleString('th-TH')} บาท
+            ช่วยค่ากระทง
           </h2>
-          <p className="mt-1 text-sm text-mist">สแกนด้วยแอปธนาคารเพื่อโอนผ่านพร้อมเพย์</p>
+          <p className="mt-1 text-sm text-mist">สแกนด้วยแอปธนาคาร ใส่เท่าไหร่ก็ได้</p>
         </div>
         <button
           ref={closeRef}
@@ -61,26 +75,26 @@ export function PaySheet({ amount, onClose }: { amount: number; onClose: () => v
       ) : (
         <div className="mx-auto mt-5 w-full max-w-[17rem] overflow-hidden rounded-2xl bg-white p-2">
           {src ? (
-            <img src={src} alt={`QR พร้อมเพย์ ${amount} บาท`} className="block h-auto w-full" />
+            <img src={src} alt="QR พร้อมเพย์สำหรับช่วยค่ากระทง" className="block h-auto w-full" />
           ) : (
             <div className="aspect-square w-full animate-pulse bg-ink/10" />
           )}
         </div>
       )}
 
-      <ol className="mt-5 space-y-1.5 text-sm text-mist">
-        <li>เปิดแอปธนาคารแล้วสแกน QR นี้</li>
-        <li>ถ้าเปิดเว็บจากมือถือเครื่องเดียวกัน ให้กดบันทึกรูป แล้วเลือกรูปจากแกลเลอรีในแอปธนาคาร</li>
-        <li>
-          ดูชื่อบัญชีในแอปก่อนกดยืนยัน{PROMPTPAY_NAME ? ` ต้องเป็น ${PROMPTPAY_NAME}` : ''}
-        </li>
-      </ol>
+      {PROMPTPAY_NAME && (
+        <p className="mt-3 text-center text-sm text-ink">
+          ชื่อบัญชี <span className="font-semibold">{PROMPTPAY_NAME}</span>
+        </p>
+      )}
+      <p className="mt-3 text-sm text-mist">ใช้มือถือเครื่องนี้อยู่ กดบันทึกรูปแล้วเปิดในแอปธนาคารได้</p>
+      <p className="mt-1 text-xs text-mist">เงินเข้าคนทำเว็บโดยตรงเป็นค่าดูแลเว็บ ไม่ใช่การบริจาค</p>
 
       <div className="mt-5 flex flex-col gap-2 sm:flex-row">
         {src && (
           <a
             href={src}
-            download={`loynamkan-promptpay-${amount}.png`}
+            download="loynamkan-promptpay.png"
             className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full border border-ink/20 px-6 text-ink no-underline hover:border-gold/60 hover:text-gold"
           >
             <Download className="size-4" aria-hidden />
@@ -91,7 +105,6 @@ export function PaySheet({ amount, onClose }: { amount: number; onClose: () => v
           เสร็จแล้ว
         </Button>
       </div>
-      <p className="mt-4 text-xs text-mist">ไม่โอนก็ไม่เป็นไรนะ กระทงของคุณลอยไปเรียบร้อยแล้ว</p>
     </aside>
   );
 }
