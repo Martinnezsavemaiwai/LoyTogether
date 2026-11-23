@@ -160,6 +160,24 @@ export function createLocalBackend(): Backend {
       return toRoom(room);
     },
 
+    async listMyRooms() {
+      const me = identity();
+      const now = Date.now();
+      return read<LocalRoom[]>(ROOMS_KEY, [])
+        .filter((r) => r.members.includes(me.userId) && (!r.expiresAt || Date.parse(r.expiresAt) > now))
+        .reverse()
+        .map((r) => ({ ...toRoom(r), isOwner: r.members[0] === me.userId }));
+    },
+
+    async closeRoom(roomId) {
+      const me = identity();
+      const rooms = read<LocalRoom[]>(ROOMS_KEY, []);
+      const room = rooms.find((r) => r.id === roomId && r.members[0] === me.userId);
+      if (!room) throw errorFromCode('not_found');
+      room.expiresAt = new Date().toISOString();
+      write(ROOMS_KEY, rooms);
+    },
+
     joinRoom(roomId, _me, handlers) {
       const seen = new Map<string, number>([[tabId, Date.now()]]);
       const emitCount = () => {

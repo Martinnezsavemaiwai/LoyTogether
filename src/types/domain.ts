@@ -61,6 +61,8 @@ export interface Room {
   riverId: RiverId;
   title: string;
   expiresAt: string | null;
+  /** Set by listMyRooms: this guest opened the room, so they may close it. */
+  isOwner?: boolean;
 }
 
 export interface CreatedRoom {

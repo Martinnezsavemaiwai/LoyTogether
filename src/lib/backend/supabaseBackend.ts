@@ -1,6 +1,7 @@
 import { createClient, type RealtimeChannel, type SupabaseClient } from '@supabase/supabase-js';
 import type { FloatKrathongInput, Identity, Krathong, Room } from '@/types/domain';
 import { generateDisplayName } from '@/lib/validation';
+import { getCaptchaToken, TURNSTILE_SITE_KEY } from '@/lib/turnstile';
 import { KRATHONG_COLUMNS, mapKrathongRow, type KrathongRow } from './mapRow';
 import { errorFromCode, type Backend, type RoomHandlers } from './types';
 
@@ -44,6 +45,7 @@ function mapRoom(row: RoomRow): Room {
 
 function toError(error: { message?: string } | null | undefined) {
   const message = error?.message ?? '';
+  if (/captcha/i.test(message)) return errorFromCode('captcha_failed');
   const code = KNOWN_CODES.find((c) => message.includes(c)) ?? 'network';
   return errorFromCode(code);
 }
@@ -63,7 +65,16 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
     const { data: sessionData } = await client.auth.getSession();
     let user = sessionData.session?.user ?? null;
     if (!user) {
-      const { data, error } = await client.auth.signInAnonymously();
+      // With CAPTCHA on in Supabase Auth > Attack Protection, sign-in without a token is refused.
+      let captchaToken: string | undefined;
+      if (TURNSTILE_SITE_KEY) {
+        try {
+          captchaToken = await getCaptchaToken(TURNSTILE_SITE_KEY);
+        } catch {
+          throw errorFromCode('captcha_failed');
+        }
+      }
+      const { data, error } = await client.auth.signInAnonymously(captchaToken ? { options: { captchaToken } } : undefined);
       if (error || !data.user) throw toError(error);
       user = data.user;
     }
@@ -186,6 +197,29 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
       const room = mapRoom(data as RoomRow);
       if (room.expiresAt && Date.parse(room.expiresAt) <= Date.now()) return null;
       return room;
+    },
+
+    async listMyRooms() {
+      // RLS returns only rooms this guest is a member of, besides the public ones filtered out here.
+      const { data, error } = await client
+        .from('rooms')
+        .select('id, room_type, river_id, title, expires_at, owner_id')
+        .neq('room_type', 'public')
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (error) throw toError(error);
+      const { data: session } = await client.auth.getSession();
+      const me = session.session?.user.id;
+      return (data as (RoomRow & { owner_id: string | null })[]).map((row) => ({
+        ...mapRoom(row),
+        isOwner: !!me && row.owner_id === me,
+      }));
+    },
+
+    async closeRoom(roomId) {
+      const { error } = await client.rpc('close_room', { p_room_id: roomId });
+      if (error) throw toError(error);
     },
 
     joinRoom(roomId, me, handlers: RoomHandlers) {
