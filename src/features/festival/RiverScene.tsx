@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useState } from 'react';
 import type { RiverId } from '@/types/domain';
 import { seededRandom } from './motion';
 
@@ -178,14 +178,6 @@ function WatArun() {
       <Reflection x={720} width={200} color="#ffd38a" seed={101} rows={20} />
       <Reflection x={530} width={70} color="#ffcf80" seed={102} rows={12} />
       <Reflection x={910} width={70} color="#ffcf80" seed={103} rows={12} />
-      {/* a lit ferry crossing slowly */}
-      <g className="lt-boat" style={{ '--d': '70s' } as CSSVars}>
-        <path d={`M-120 ${HZ + 70} l90 0 l-10 12 l-72 0 z`} fill="#0a0d1d" />
-        <rect x="-100" y={HZ + 58} width="54" height="12" rx="2" fill="#12162c" />
-        {[-96, -86, -76, -66, -56].map((x) => (
-          <rect key={x} x={x} y={HZ + 61} width="5" height="5" fill="#ffd38a" />
-        ))}
-      </g>
     </g>
   );
 }
@@ -296,7 +288,6 @@ function Sukhothai() {
           <stop offset="100%" stopColor="#a8683a" />
         </linearGradient>
       </defs>
-      <Fireworks seed={31} count={5} region={[380, 40, 1060, 220]} />
       <rect x="0" y={HZ - 18} width={W} height="18" fill="#0a0d1d" />
       <Treeline seed={32} color="#0a0d1d" y={HZ - 14} height={30} />
       {/* ruined vihara pillars */}
@@ -362,7 +353,6 @@ function ChiangMai() {
       {/* Doi Suthep */}
       <path d={`M0 ${HZ - 30} Q220 ${HZ - 260} 520 ${HZ - 190} Q700 ${HZ - 150} 900 ${HZ - 240} Q1180 ${HZ - 330} 1440 ${HZ - 120} L1440 ${HZ} L0 ${HZ} Z`} fill="#121a36" />
       <circle cx="960" cy={HZ - 238} r="3" fill="#ffd27a" />
-      <SkyLanterns seed={41} count={22} />
       <rect x="0" y={HZ - 20} width={W} height="20" fill="#0a0e1f" />
       <Treeline seed={42} color="#0a0e1f" y={HZ - 16} height={28} />
       <LannaRoof cx={560} base={HZ - 16} s={0.8} />
@@ -420,7 +410,6 @@ function RoiEt() {
           <stop offset="100%" stopColor="#c08643" />
         </linearGradient>
       </defs>
-      <Fireworks seed={51} count={3} region={[860, 60, 1100, 200]} />
       <rect x="0" y={HZ - 16} width={W} height="16" fill="#0a0d20" />
       <Treeline seed={52} color="#0a0d20" y={HZ - 12} height={44} />
       {/* island with a sala */}
@@ -474,6 +463,29 @@ function Sut() {
   );
 }
 
+function Boat() {
+  return (
+    <g>
+      {/* a lit ferry crossing slowly */}
+      <g className="lt-boat" style={{ '--d': '70s' } as CSSVars}>
+        <path d={`M-120 ${HZ + 70} l90 0 l-10 12 l-72 0 z`} fill="#0a0d1d" />
+        <rect x="-100" y={HZ + 58} width="54" height="12" rx="2" fill="#12162c" />
+        {[-96, -86, -76, -66, -56].map((x) => (
+          <rect key={x} x={x} y={HZ + 61} width="5" height="5" fill="#ffd38a" />
+        ))}
+      </g>
+    </g>
+  );
+}
+
+/** Moving parts drawn over the rendered backdrop. */
+const FX: Partial<Record<RiverId, () => React.ReactElement>> = {
+  wat_arun: Boat,
+  sukhothai: () => <Fireworks seed={31} count={5} region={[380, 40, 1060, 220]} />,
+  chiang_mai: () => <SkyLanterns seed={41} count={22} />,
+  roi_et: () => <Fireworks seed={51} count={3} region={[860, 60, 1100, 200]} />,
+};
+
 const LANDMARK: Record<RiverId, () => React.ReactElement> = {
   wat_arun: WatArun,
   lumphini: Lumphini,
@@ -483,9 +495,28 @@ const LANDMARK: Record<RiverId, () => React.ReactElement> = {
   sut: Sut,
 };
 
-function RiverSceneImpl({ river, className }: { river: RiverId; className?: string }) {
+/** Blender renders in public/scenes (see blender/venues.py). The SVG scene shows until it loads. */
+function backdropUrl(river: RiverId, size: 'sm' | 'lg' | 'auto') {
+  const small =
+    size === 'sm' ||
+    (size === 'auto' && typeof window !== 'undefined' && window.innerWidth * (window.devicePixelRatio || 1) < 1100);
+  return `/scenes/${river}${small ? '-sm' : ''}.webp`;
+}
+
+function RiverSceneImpl({
+  river,
+  className,
+  size = 'auto',
+}: {
+  river: RiverId;
+  className?: string;
+  size?: 'sm' | 'lg' | 'auto';
+}) {
   const t = THEMES[river];
   const Landmark = LANDMARK[river];
+  const Fx = FX[river];
+  const href = useMemo(() => backdropUrl(river, size), [river, size]);
+  const [loaded, setLoaded] = useState<string | null>(null);
   return (
     <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid slice" className={className} aria-hidden="true">
       <defs>
@@ -537,6 +568,19 @@ function RiverSceneImpl({ river, className }: { river: RiverId; className?: stri
       <Reflection x={t.moon.x} width={70} color="#fff3d6" seed={t.moon.x} rows={14} />
 
       <Landmark />
+
+      <image
+        href={href}
+        x="0"
+        y="0"
+        width={W}
+        height={H}
+        preserveAspectRatio="xMidYMid slice"
+        onLoad={() => setLoaded(href)}
+        style={{ opacity: loaded === href ? 1 : 0, transition: 'opacity 900ms ease-out' }}
+      />
+
+      {Fx && <Fx />}
 
       <g className="lt-swell" stroke="#ffffff" strokeOpacity="0.05" strokeWidth="2" fill="none">
         {[520, 600, 690, 790].map((y) => (
