@@ -1,5 +1,6 @@
 import { memo, useId, type ReactNode } from 'react';
-import type { KrathongDesign, KrathongShape } from '@/types/domain';
+import type { KrathongDesign, KrathongFlower, KrathongShape } from '@/types/domain';
+import { flowerPhases } from './options';
 
 /**
  * A krathong drawn from its parts in a three-quarter view. The plate follows the
@@ -52,6 +53,7 @@ const BASE = {
   flower: { side: '#9c4c69', rim: '#d9839f', top: '#f3c6d3', light: '#fff0f4', vein: '#b9607f' },
   bread: { side: '#8a5426', rim: '#c4843f', top: '#e3b46f', light: '#f6d9a2', vein: '#a86a30' },
   banana_trunk: { side: '#9fae7a', rim: '#d5dfb2', top: '#eef2d6', light: '#ffffff', vein: '#b8c48f' },
+  ice: { side: '#8fb8d8', rim: '#cfe8ff', top: '#e8f5ff', light: '#ffffff', vein: '#a8cde8' },
 } as const;
 
 const CANDLE = {
@@ -66,10 +68,9 @@ const BEAD = {
   purple: '#b79cff',
   pink: '#ff9fc6',
   pearl: '#fbf7ee',
-  jasmine_garland: '#fbf7ee',
 } as const;
 
-function Flower({ kind, x, y, s }: { kind: KrathongDesign['flower']; x: number; y: number; s: number }) {
+function Flower({ kind, x, y, s }: { kind: KrathongFlower; x: number; y: number; s: number }) {
   const t = `translate(${f(x)} ${f(y)}) scale(${s})`;
   switch (kind) {
     case 'marigold':
@@ -161,8 +162,11 @@ interface KrathongSvgProps {
 function KrathongSvgImpl({ design, className, lit = true, title }: KrathongSvgProps) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
   const base = BASE[design.base];
-  const candle = CANDLE[design.candle];
-  const bead = BEAD[design.decoration];
+  const candle = design.candle ? CANDLE[design.candle] : null;
+  const bead = design.beads ? BEAD[design.beads] : null;
+  // slot i of the nine-slot ring takes the kind assigned to phase i % 3
+  const phases = flowerPhases(design.flowers);
+  const kindAt = (i: number): KrathongFlower | undefined => phases.find((p) => p.phase === i % 3)?.kind;
   const isLeaf = design.base === 'banana_leaf' || design.base === 'banana_rose';
   const thickness = design.base === 'banana_trunk' ? 13 : design.base === 'bread' ? 9 : 6;
 
@@ -219,9 +223,8 @@ function KrathongSvgImpl({ design, className, lit = true, title }: KrathongSvgPr
     hasFolds ? inner.filter((o) => o.back === backHalf).map((o, i) => fold(o.p, 0.78, 26, `i${backHalf}${i}`, 'inner')) : null;
 
   // Flowers sit in a ring on the plate.
-  const ringCount = design.flower === 'lotus' ? 7 : 9;
-  const ring = shapeOutline(design.shape, ringCount).map((p) => ({ ...project(p, 0.6, 12), back: p.y < 0 }));
-  const flowerScale = design.flower === 'lotus' ? 0.9 : 0.95;
+  const ring = shapeOutline(design.shape, 9).map((p, i) => ({ ...project(p, 0.6, 12), back: p.y < 0, kind: kindAt(i) }));
+  const flowerScale = 0.95;
 
   const beads = shapeOutline(design.shape, 26).map((p) => ({ ...project(p, 0.86, 6), back: p.y < 0 }));
 
@@ -264,16 +267,18 @@ function KrathongSvgImpl({ design, className, lit = true, title }: KrathongSvgPr
           <stop offset="70%" stopColor={base.top} />
           <stop offset="100%" stopColor={base.rim} />
         </radialGradient>
-        <linearGradient id={`candle${uid}`} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor={candle.shade} />
-          <stop offset="35%" stopColor={candle.body} />
-          <stop offset="70%" stopColor={candle.body} />
-          <stop offset="100%" stopColor={candle.shade} />
-        </linearGradient>
+        {candle && (
+          <linearGradient id={`candle${uid}`} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor={candle.shade} />
+            <stop offset="35%" stopColor={candle.body} />
+            <stop offset="70%" stopColor={candle.body} />
+            <stop offset="100%" stopColor={candle.shade} />
+          </linearGradient>
+        )}
       </defs>
 
       {/* glow and reflection on the water */}
-      {lit && <ellipse cx={CX} cy={CY + 34} rx="22" ry="34" fill={`url(#glow${uid})`} opacity="0.55" />}
+      {lit && candle && <ellipse cx={CX} cy={CY + 34} rx="22" ry="34" fill={`url(#glow${uid})`} opacity="0.55" />}
       <ellipse cx={CX} cy={CY + 22} rx={R * 1.3} ry="10" fill="#000" opacity="0.22" />
 
       {/* plate body with thickness */}
@@ -306,16 +311,21 @@ function KrathongSvgImpl({ design, className, lit = true, title }: KrathongSvgPr
       {innerFolds(true)}
 
       {/* back decoration and flowers */}
-      {beads.filter((b) => b.back).map((b, i) => (
-        <circle key={`bb${i}`} cx={b.x} cy={b.y} r="2.1" fill={bead} />
-      ))}
-      {ring.filter((r) => r.back).map((r, i) => (
-        <Flower key={`fb${i}`} kind={design.flower} x={r.x} y={r.y} s={flowerScale * 0.85} />
-      ))}
+      {bead &&
+        beads.filter((b) => b.back).map((b, i) => <circle key={`bb${i}`} cx={b.x} cy={b.y} r="2.1" fill={bead} />)}
+      {design.garland &&
+        beads.filter((b) => b.back).map((b, i) => <circle key={`gb${i}`} cx={b.x} cy={b.y - 2} r="1.6" fill="#fffdf4" />)}
+      {ring
+        .filter((r) => r.back && r.kind)
+        .map((r, i) => (
+          <Flower key={`fb${i}`} kind={r.kind!} x={r.x} y={r.y} s={flowerScale * 0.85} />
+        ))}
 
       {centerCone}
 
       {/* incense */}
+      {design.incense && (
+      <>
       <g stroke="#7a4a2c" strokeWidth="1.3" strokeLinecap="round">
         <line x1={CX + 13} y1={CY - 22} x2={CX + 19} y2={CY - 78} />
         <line x1={CX + 17} y1={CY - 20} x2={CX + 26} y2={CY - 74} />
@@ -332,8 +342,12 @@ function KrathongSvgImpl({ design, className, lit = true, title }: KrathongSvgPr
           <path d={`M${CX + 33} ${CY - 71} q4 -8 -1 -14 q-5 -6 1 -13`} />
         </g>
       )}
+      </>
+      )}
 
       {/* candle */}
+      {candle && (
+      <>
       <rect x={CX - 6.5} y={candleTop} width="13" height={candleBottom - candleTop} rx="3" fill={`url(#candle${uid})`} />
       <path d={`M${CX - 6.5} ${candleTop + 3} q2 7 3 1 q1 9 3 2`} fill={candle.body} />
       <ellipse cx={CX} cy={candleTop} rx="6.5" ry="2.2" fill={candle.shade} />
@@ -345,9 +359,24 @@ function KrathongSvgImpl({ design, className, lit = true, title }: KrathongSvgPr
         fill={`url(#flame${uid})`}
       />
       <ellipse cx={CX} cy={candleTop - 8} rx="1.6" ry="3" fill="#fffbe9" opacity="0.9" />
+      </>
+      )}
+
+      {design.coins && (
+        <g>
+          {[[-30, 16, '#d9a441'], [-16, 22, '#cfd3da'], [0, 24, '#d9a441'], [16, 22, '#cfd3da'], [29, 15, '#cfd3da']].map(
+            ([dx, dy, c], i) => (
+              <g key={`coin${i}`}>
+                <ellipse cx={CX + (dx as number)} cy={CY + (dy as number) - 6} rx="5" ry="2.2" fill={c as string} />
+                <ellipse cx={CX + (dx as number)} cy={CY + (dy as number) - 6.6} rx="3" ry="1.2" fill="#fff" opacity="0.35" />
+              </g>
+            ),
+          )}
+        </g>
+      )}
 
       {/* garland or ribbon across the front */}
-      {design.decoration === 'jasmine_garland' ? (
+      {design.garland && (
         <g>
           {Array.from({ length: 15 }, (_, i) => {
             const u = i / 14;
@@ -357,7 +386,8 @@ function KrathongSvgImpl({ design, className, lit = true, title }: KrathongSvgPr
           })}
           <path d={`M${CX - 2} ${CY + 21} l-3 9 M${CX + 2} ${CY + 21} l3 9`} stroke="#2f7a3f" strokeWidth="1.4" />
         </g>
-      ) : (
+      )}
+      {bead && !design.garland && (
         <path
           d={`M${CX - R * 0.92} ${CY + 3} Q${CX - R * 0.45} ${CY + 22} ${CX} ${CY + 18} Q${CX + R * 0.45} ${CY + 22} ${CX + R * 0.92} ${CY + 3}`}
           fill="none"
@@ -371,22 +401,27 @@ function KrathongSvgImpl({ design, className, lit = true, title }: KrathongSvgPr
 
       {/* front folds, flowers and decoration */}
       {innerFolds(false)}
-      {ring.filter((r) => !r.back).map((r, i) => (
-        <Flower key={`ff${i}`} kind={design.flower} x={r.x} y={r.y} s={flowerScale} />
-      ))}
-      {beads.filter((b) => !b.back).map((b, i) => (
-        <g key={`fbd${i}`}>
-          <circle cx={b.x} cy={b.y} r="2.4" fill={bead} />
-          <circle cx={b.x - 0.7} cy={b.y - 0.8} r="0.7" fill="#fff" opacity="0.7" />
-        </g>
-      ))}
+      {ring
+        .filter((r) => !r.back && r.kind)
+        .map((r, i) => (
+          <Flower key={`ff${i}`} kind={r.kind!} x={r.x} y={r.y} s={flowerScale} />
+        ))}
+      {bead &&
+        beads.filter((b) => !b.back).map((b, i) => (
+          <g key={`fbd${i}`}>
+            <circle cx={b.x} cy={b.y} r="2.4" fill={bead} />
+            <circle cx={b.x - 0.7} cy={b.y - 0.8} r="0.7" fill="#fff" opacity="0.7" />
+          </g>
+        ))}
+      {design.garland &&
+        beads.filter((b) => !b.back).map((b, i) => <circle key={`gf${i}`} cx={b.x} cy={b.y - 2} r="1.8" fill="#fffdf4" />)}
       {outerFolds(false)}
       {hasFolds &&
         outer
           .filter((o) => !o.back)
           .map((o, i) => {
             const tip = project(o.p, 1.02 * 1.18, 20);
-            return <circle key={`tip${i}`} cx={tip.x} cy={tip.y} r="1.7" fill={bead} />;
+            return <circle key={`tip${i}`} cx={tip.x} cy={tip.y} r="1.7" fill={bead ?? '#f5c76a'} />;
           })}
     </svg>
   );

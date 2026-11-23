@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Flag, Lock, X } from 'lucide-react';
-import { KrathongSvg } from '@/features/krathong/KrathongSvg';
+import { KrathongArt } from '@/features/krathong/KrathongArt';
 import { backend, errorMessage } from '@/lib/backend';
 import type { Krathong } from '@/types/domain';
 
@@ -97,7 +97,7 @@ export function KrathongDetails({ krathong, isMine, onClose, onReported }: Props
       className="lt-rise fixed inset-x-0 bottom-0 z-[200] max-h-[70svh] overflow-y-auto rounded-t-[2rem] border-t border-ink/15 bg-surface/95 p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-[0_-20px_60px_-10px_rgb(0_0_0/0.6)] backdrop-blur-md sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-[24rem] sm:rounded-[2rem] sm:border"
     >
       <div className="flex items-start gap-4">
-        <KrathongSvg design={krathong.design} lit={false} className="w-24 shrink-0" />
+        <KrathongArt design={krathong.design} lit={false} className="w-24 shrink-0" />
         <div className="min-w-0 flex-1">
           <h2 id="krathong-detail-title" className="break-words text-xl font-semibold text-ink">
             {krathong.krathongName}

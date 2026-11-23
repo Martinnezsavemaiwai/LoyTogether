@@ -1,5 +1,5 @@
 import { memo, useState } from 'react';
-import { KrathongSvg } from '@/features/krathong/KrathongSvg';
+import { KrathongArt } from '@/features/krathong/KrathongArt';
 import type { Krathong } from '@/types/domain';
 import { driftDelaySeconds, floatParams } from './motion';
 
@@ -46,7 +46,7 @@ const FloatingItem = memo(function FloatingItem({
         />
       )}
       <div className={justFloated ? 'lt-release' : undefined}>
-        <KrathongSvg design={krathong.design} className="block h-auto w-full drop-shadow-[0_10px_18px_rgb(0_0_0/0.45)]" />
+        <KrathongArt design={krathong.design} className="block h-auto w-full drop-shadow-[0_10px_18px_rgb(0_0_0/0.45)]" />
       </div>
       {(isMine || justFloated) && (
         <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-night/70 px-2 py-0.5 text-[11px] text-gold">
