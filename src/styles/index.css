@@ -1,0 +1,377 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-night: #090d1c;
+  --color-surface: #141b32;
+  --color-surface-2: #1c2545;
+  --color-gold: #f5c76a;
+  --color-gold-deep: #d9a441;
+  --color-violet: #a78bfa;
+  --color-water: #263b68;
+  --color-ink: #fff9ec;
+  --color-mist: #a7aec4;
+  --color-danger: #ff9b9b;
+
+  --font-thai: 'IBM Plex Sans Thai', system-ui, sans-serif;
+  --font-display: 'Playfair Display', 'IBM Plex Sans Thai', serif;
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+:root {
+  color-scheme: dark;
+  background: var(--color-night);
+  color: var(--color-ink);
+  font-family: var(--font-thai);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: rgb(245 199 106 / 0.35);
+  color: var(--color-ink);
+}
+
+* {
+  scrollbar-color: rgb(167 139 250 / 0.4) transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+input,
+textarea {
+  caret-color: var(--color-gold);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: rgb(167 174 196 / 0.75);
+}
+
+a {
+  text-underline-offset: 0.2em;
+}
+
+/* ---------- Atmosphere ---------- */
+
+@keyframes lt-twinkle {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes lt-shimmer {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scaleX(0.85);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scaleX(1.1);
+  }
+}
+
+@keyframes lt-firefly {
+  0% {
+    transform: translate(0, 0);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  50% {
+    transform: translate(18px, -26px);
+  }
+  80% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(-10px, -48px);
+    opacity: 0;
+  }
+}
+
+@keyframes lt-swell {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(-3%);
+  }
+}
+
+.lt-star {
+  animation: lt-twinkle var(--d, 4s) ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+.lt-shimmer {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: lt-shimmer var(--d, 5s) ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+.lt-firefly {
+  animation: lt-firefly var(--d, 7s) ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+.lt-swell {
+  animation: lt-swell 14s ease-in-out infinite;
+}
+
+
+@keyframes lt-boat {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(1700px);
+  }
+}
+
+@keyframes lt-firework {
+  0%,
+  55% {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  62% {
+    opacity: 1;
+  }
+  85% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1.1) translateY(6px);
+    opacity: 0;
+  }
+}
+
+@keyframes lt-khomloi {
+  0% {
+    transform: translate(0, 0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(var(--drift, 0px), -460px);
+    opacity: 0;
+  }
+}
+
+.lt-boat {
+  animation: lt-boat var(--d, 60s) linear infinite;
+}
+
+.lt-firework {
+  animation: lt-firework var(--d, 6s) ease-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+.lt-khomloi {
+  animation: lt-khomloi var(--d, 24s) linear infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+/* ---------- Krathong ---------- */
+
+@keyframes lt-flicker {
+  0%,
+  100% {
+    transform: scale(1, 1) skewX(0deg);
+  }
+  25% {
+    transform: scale(0.94, 1.06) skewX(2deg);
+  }
+  50% {
+    transform: scale(1.04, 0.95) skewX(-1.5deg);
+  }
+  75% {
+    transform: scale(0.97, 1.03) skewX(1deg);
+  }
+}
+
+@keyframes lt-glow {
+  0%,
+  100% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.lt-flame {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: lt-flicker 1.6s ease-in-out infinite;
+}
+
+@keyframes lt-smoke {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+.lt-smoke {
+  animation: lt-smoke 4s ease-out infinite;
+}
+
+.lt-glow {
+  animation: lt-glow 2.4s ease-in-out infinite;
+}
+
+/* Drift: the lane is full width, so translateX(%) is relative to the river. */
+@keyframes lt-drift {
+  from {
+    transform: translateX(-12%);
+  }
+  to {
+    transform: translateX(104%);
+  }
+}
+
+@keyframes lt-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(var(--tilt, 0deg));
+  }
+  50% {
+    transform: translateY(-4px) rotate(calc(var(--tilt, 0deg) * -1));
+  }
+}
+
+@keyframes lt-release {
+  0% {
+    transform: translateY(-80px) scale(1.25);
+    opacity: 0;
+  }
+  45% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes lt-ripple {
+  0% {
+    transform: scale(0.3);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+.lt-lane {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+  animation: lt-drift var(--drift, 90s) linear infinite;
+  animation-delay: var(--drift-delay, 0s);
+  will-change: transform;
+}
+
+.lt-bob {
+  animation: lt-bob var(--bob, 4s) ease-in-out infinite;
+}
+
+.lt-release {
+  animation: lt-release 1.8s var(--ease-out-expo) both;
+}
+
+.lt-ripple {
+  animation: lt-ripple 2.2s ease-out both;
+}
+
+/* ---------- Page transitions ---------- */
+
+@keyframes lt-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.lt-rise {
+  animation: lt-rise 0.9s var(--ease-out-expo) both;
+  animation-delay: var(--delay, 0s);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lt-star,
+  .lt-shimmer,
+  .lt-firefly,
+  .lt-swell,
+  .lt-boat,
+  .lt-firework,
+  .lt-khomloi,
+  .lt-flame,
+  .lt-glow,
+  .lt-smoke,
+  .lt-bob {
+    animation: none;
+  }
+  /* Krathongs hold their shared position instead of drifting. */
+  .lt-lane {
+    animation-play-state: paused;
+  }
+  .lt-release,
+  .lt-ripple,
+  .lt-rise {
+    animation-duration: 1ms;
+  }
+}
+
+/* Low-power hint set by the app for small or slow devices. */
+[data-lite='true'] .lt-firefly,
+[data-lite='true'] .lt-firework,
+[data-lite='true'] .lt-shimmer {
+  animation: none;
+}
