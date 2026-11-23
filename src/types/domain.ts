@@ -3,17 +3,25 @@ export type RiverId = 'wat_arun' | 'lumphini' | 'sukhothai' | 'chiang_mai' | 'ro
 export type RoomType = 'public' | 'private' | 'couple';
 
 export type KrathongShape = 'lotus' | 'circle' | 'heart';
-export type KrathongBase = 'banana_leaf' | 'banana_rose' | 'flower' | 'bread' | 'banana_trunk';
+export type KrathongBase = 'banana_leaf' | 'banana_rose' | 'flower' | 'bread' | 'banana_trunk' | 'ice';
 export type KrathongFlower = 'marigold' | 'rose' | 'orchid' | 'lotus' | 'jasmine' | 'chrysanthemum';
 export type KrathongCandle = 'golden' | 'white' | 'pink' | 'red';
-export type KrathongDecoration = 'gold' | 'purple' | 'pink' | 'pearl' | 'jasmine_garland';
+export type KrathongBeads = 'gold' | 'purple' | 'pink' | 'pearl';
 
+/**
+ * shape and base are required. Everything that goes on the plate is optional:
+ * up to three flower kinds, a candle or none, incense, a bead colour or none,
+ * a jasmine garland, and coins (the visitor chose to put money in).
+ */
 export interface KrathongDesign {
   shape: KrathongShape;
   base: KrathongBase;
-  flower: KrathongFlower;
-  candle: KrathongCandle;
-  decoration: KrathongDecoration;
+  flowers: KrathongFlower[];
+  candle: KrathongCandle | null;
+  incense: boolean;
+  beads: KrathongBeads | null;
+  garland: boolean;
+  coins: boolean;
 }
 
 export type WishVisibility = 'public' | 'private';

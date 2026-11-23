@@ -1,7 +1,7 @@
 import type {
   KrathongBase,
+  KrathongBeads,
   KrathongCandle,
-  KrathongDecoration,
   KrathongDesign,
   KrathongFlower,
   KrathongShape,
@@ -24,6 +24,7 @@ export const BASES: Option<KrathongBase>[] = [
   { value: 'flower', label: 'กลีบดอกไม้' },
   { value: 'bread', label: 'ขนมปัง' },
   { value: 'banana_trunk', label: 'หยวกกล้วย' },
+  { value: 'ice', label: 'น้ำแข็ง' },
 ];
 
 export const FLOWERS: Option<KrathongFlower>[] = [
@@ -42,49 +43,99 @@ export const CANDLES: Option<KrathongCandle>[] = [
   { value: 'red', label: 'แดง' },
 ];
 
-export const DECORATIONS: Option<KrathongDecoration>[] = [
-  { value: 'gold', label: 'ลูกปัดทอง' },
-  { value: 'purple', label: 'ลูกปัดม่วง' },
-  { value: 'pink', label: 'ลูกปัดชมพู' },
+export const BEADS: Option<KrathongBeads>[] = [
+  { value: 'gold', label: 'ทอง' },
+  { value: 'purple', label: 'ม่วง' },
+  { value: 'pink', label: 'ชมพู' },
   { value: 'pearl', label: 'มุก' },
-  { value: 'jasmine_garland', label: 'มาลัยมะลิ' },
 ];
+
+export const MAX_FLOWERS = 3;
 
 export const DEFAULT_DESIGN: KrathongDesign = {
   shape: 'lotus',
   base: 'banana_leaf',
-  flower: 'marigold',
+  flowers: ['marigold'],
   candle: 'golden',
-  decoration: 'gold',
+  incense: true,
+  beads: 'gold',
+  garland: false,
+  coins: false,
 };
 
-const ALLOWED = {
-  shape: SHAPES.map((o) => o.value),
-  base: BASES.map((o) => o.value),
-  flower: FLOWERS.map((o) => o.value),
-  candle: CANDLES.map((o) => o.value),
-  decoration: DECORATIONS.map((o) => o.value),
-} as const;
+const values = <T extends string>(list: Option<T>[]) => list.map((o) => o.value) as readonly T[];
+const SHAPE_V = values(SHAPES);
+const BASE_V = values(BASES);
+const FLOWER_V = values(FLOWERS);
+const CANDLE_V = values(CANDLES);
+const BEAD_V = values(BEADS);
+const KEYS = ['shape', 'base', 'flowers', 'candle', 'incense', 'beads', 'garland', 'coins'];
 
-const KEYS = Object.keys(ALLOWED) as (keyof KrathongDesign)[];
+const isOneOf = <T,>(list: readonly T[], v: unknown): v is T => list.includes(v as T);
 
 export function isValidDesign(value: unknown): value is KrathongDesign {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  const record = value as Record<string, unknown>;
-  if (Object.keys(record).length !== KEYS.length) return false;
-  return KEYS.every((key) => (ALLOWED[key] as readonly unknown[]).includes(record[key]));
+  const d = value as Record<string, unknown>;
+  if (Object.keys(d).length !== KEYS.length || !KEYS.every((k) => k in d)) return false;
+  const flowers = d.flowers;
+  return (
+    isOneOf(SHAPE_V, d.shape) &&
+    isOneOf(BASE_V, d.base) &&
+    Array.isArray(flowers) &&
+    flowers.length <= MAX_FLOWERS &&
+    new Set(flowers).size === flowers.length &&
+    flowers.every((f) => isOneOf(FLOWER_V, f)) &&
+    (d.candle === null || isOneOf(CANDLE_V, d.candle)) &&
+    typeof d.incense === 'boolean' &&
+    (d.beads === null || isOneOf(BEAD_V, d.beads)) &&
+    typeof d.garland === 'boolean' &&
+    typeof d.coins === 'boolean'
+  );
 }
 
-/** Falls back to the default for any unknown value, e.g. from old or tampered rows. */
+/**
+ * Accepts the current shape, the older single-choice shape
+ * ({ flower, candle, decoration }) and partial or tampered data, field by field.
+ */
 export function normalizeDesign(value: unknown): KrathongDesign {
   if (isValidDesign(value)) return value;
-  const record = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
-  const out = { ...DEFAULT_DESIGN };
-  for (const key of KEYS) {
-    const v = record[key];
-    if ((ALLOWED[key] as readonly unknown[]).includes(v)) {
-      (out as Record<string, unknown>)[key] = v;
-    }
+  const d = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
+  const out: KrathongDesign = { ...DEFAULT_DESIGN, flowers: [...DEFAULT_DESIGN.flowers] };
+  if (isOneOf(SHAPE_V, d.shape)) out.shape = d.shape;
+  if (isOneOf(BASE_V, d.base)) out.base = d.base;
+  if (Array.isArray(d.flowers)) {
+    out.flowers = [...new Set(d.flowers.filter((f): f is KrathongDesign['flowers'][number] => isOneOf(FLOWER_V, f)))].slice(
+      0,
+      MAX_FLOWERS,
+    );
+  } else if (isOneOf(FLOWER_V, d.flower)) {
+    out.flowers = [d.flower];
   }
+  if (d.candle === null) out.candle = null;
+  else if (isOneOf(CANDLE_V, d.candle)) out.candle = d.candle;
+  if (typeof d.incense === 'boolean') out.incense = d.incense;
+  if (d.beads === null) out.beads = null;
+  else if (isOneOf(BEAD_V, d.beads)) out.beads = d.beads;
+  else if (isOneOf(BEAD_V, d.decoration)) out.beads = d.decoration;
+  else if (d.decoration === 'jasmine_garland') out.beads = null;
+  if (typeof d.garland === 'boolean') out.garland = d.garland;
+  else if (d.decoration === 'jasmine_garland') out.garland = true;
+  if (typeof d.coins === 'boolean') out.coins = d.coins;
   return out;
+}
+
+/**
+ * Nine flower slots sit in a ring, grouped into three phases (slot % 3).
+ * One kind fills all three phases; two kinds split 2:1; three kinds take one each.
+ */
+export function flowerPhases(flowers: KrathongFlower[]): { kind: KrathongFlower; phase: 0 | 1 | 2 }[] {
+  if (flowers.length === 0) return [];
+  if (flowers.length === 1) return [0, 1, 2].map((p) => ({ kind: flowers[0]!, phase: p as 0 | 1 | 2 }));
+  if (flowers.length === 2)
+    return [
+      { kind: flowers[0]!, phase: 0 },
+      { kind: flowers[1]!, phase: 1 },
+      { kind: flowers[0]!, phase: 2 },
+    ];
+  return flowers.slice(0, 3).map((kind, i) => ({ kind, phase: i as 0 | 1 | 2 }));
 }

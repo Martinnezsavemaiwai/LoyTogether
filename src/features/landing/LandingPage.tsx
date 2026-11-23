@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '@/components/ui/Button';
-import { SoundToggle } from '@/components/common/SoundToggle';
+import { SongButton, useSongStore } from '@/features/music/SongDock';
 import { FloatingKrathongs } from '@/features/festival/FloatingKrathongs';
 import { RiverScene } from '@/features/festival/RiverScene';
 import { seededRandom } from '@/features/festival/motion';
-import { KrathongSvg } from '@/features/krathong/KrathongSvg';
-import { BASES, CANDLES, DECORATIONS, FLOWERS, SHAPES } from '@/features/krathong/options';
+import { KrathongArt } from '@/features/krathong/KrathongArt';
+import { BASES, BEADS, CANDLES, FLOWERS, SHAPES } from '@/features/krathong/options';
 import { RIVERS } from '@/features/rivers/rivers';
 import type { Krathong } from '@/types/domain';
 
@@ -25,9 +25,12 @@ function useSceneryKrathongs(): Krathong[] {
       design: {
         shape: pick(SHAPES),
         base: pick(BASES),
-        flower: pick(FLOWERS),
+        flowers: [...new Set([pick(FLOWERS), pick(FLOWERS)])],
         candle: pick(CANDLES),
-        decoration: pick(DECORATIONS),
+        incense: rand() > 0.3,
+        beads: rand() > 0.4 ? pick(BEADS) : null,
+        garland: rand() > 0.6,
+        coins: false,
       },
       wishVisibility: 'private',
       publicWish: null,
@@ -46,6 +49,12 @@ const STEPS = [
 export function LandingPage() {
   const navigate = useNavigate();
   const scenery = useSceneryKrathongs();
+  const startSong = useSongStore((s) => s.start);
+  // The first tap into the festival starts the song (browsers allow sound after a tap).
+  const enter = () => {
+    startSong();
+    navigate('/rivers');
+  };
 
   return (
     <main className="relative">
@@ -57,7 +66,7 @@ export function LandingPage() {
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[190] h-1/2 bg-gradient-to-t from-night via-night/75 to-transparent" />
 
         <header className="absolute inset-x-0 top-0 z-[200] flex items-center justify-end p-4 sm:p-6">
-          <SoundToggle />
+          <SongButton />
         </header>
 
         <div className="absolute inset-x-0 bottom-0 z-[200] px-6 pb-[max(2.5rem,env(safe-area-inset-bottom))] sm:px-10 lg:pb-16 lg:pl-[6%]">
@@ -75,7 +84,7 @@ export function LandingPage() {
             className="lt-rise mt-8 flex flex-wrap items-center gap-4"
             style={{ '--delay': '0.3s' } as React.CSSProperties}
           >
-            <Button onClick={() => navigate('/rivers')} className="px-8 text-lg">
+            <Button onClick={enter} className="px-8 text-lg">
               ไปลอยกระทง
             </Button>
             <span className="text-sm text-mist">ไม่ต้องสมัครสมาชิก</span>
@@ -84,8 +93,8 @@ export function LandingPage() {
       </section>
 
       <section className="mx-auto grid max-w-5xl gap-10 px-6 py-20 sm:px-10 md:grid-cols-[1fr_1.1fr] md:items-center md:py-28">
-        <KrathongSvg
-          design={{ shape: 'lotus', base: 'banana_rose', flower: 'lotus', candle: 'golden', decoration: 'jasmine_garland' }}
+        <KrathongArt
+          design={{ shape: 'lotus', base: 'banana_rose', flowers: ['lotus', 'marigold'], candle: 'golden', incense: true, beads: null, garland: true, coins: false }}
           className="mx-auto w-full max-w-[22rem]"
           title="กระทงใบตองพับกลีบกุหลาบ ประดับบัวตูมและมาลัยมะลิ"
         />
@@ -105,7 +114,7 @@ export function LandingPage() {
               </li>
             ))}
           </ol>
-          <Button onClick={() => navigate('/rivers')} variant="ghost" className="mt-10">
+          <Button onClick={enter} variant="ghost" className="mt-10">
             ดูที่ลอยทั้ง {RIVERS.length} แห่ง
           </Button>
         </div>

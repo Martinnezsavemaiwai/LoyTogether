@@ -1,15 +1,18 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { DEFAULT_DESIGN, normalizeDesign } from '@/features/krathong/options';
-import type { KrathongDesign, WishVisibility } from '@/types/domain';
+import { DEFAULT_DESIGN, MAX_FLOWERS, normalizeDesign } from '@/features/krathong/options';
+import type { KrathongDesign, KrathongFlower, WishVisibility } from '@/types/domain';
 
 type DraftState = {
   design: KrathongDesign;
   krathongName: string;
   wish: string;
   visibility: WishVisibility;
+  /** Baht the visitor chose to put in; never stored on the server. */
+  tip: number | null;
   setPart: <K extends keyof KrathongDesign>(key: K, value: KrathongDesign[K]) => void;
-  setField: (patch: Partial<Pick<DraftState, 'krathongName' | 'wish' | 'visibility'>>) => void;
+  toggleFlower: (kind: KrathongFlower) => void;
+  setField: (patch: Partial<Pick<DraftState, 'krathongName' | 'wish' | 'visibility' | 'tip'>>) => void;
   resetDesign: () => void;
   clear: () => void;
 };
@@ -22,10 +25,18 @@ export const useDraftStore = create<DraftState>()(
       krathongName: '',
       wish: '',
       visibility: 'private',
+      tip: null,
       setPart: (key, value) => set((s) => ({ design: { ...s.design, [key]: value } })),
+      toggleFlower: (kind) =>
+        set((s) => {
+          const has = s.design.flowers.includes(kind);
+          if (!has && s.design.flowers.length >= MAX_FLOWERS) return s;
+          const flowers = has ? s.design.flowers.filter((f) => f !== kind) : [...s.design.flowers, kind];
+          return { design: { ...s.design, flowers } };
+        }),
       setField: (patch) => set(patch),
-      resetDesign: () => set({ design: DEFAULT_DESIGN }),
-      clear: () => set({ design: DEFAULT_DESIGN, krathongName: '', wish: '', visibility: 'private' }),
+      resetDesign: () => set((s) => ({ design: { ...DEFAULT_DESIGN, coins: s.tip !== null } })),
+      clear: () => set({ krathongName: '', wish: '', visibility: 'private', tip: null }),
     }),
     {
       name: 'loynamkan:draft',
@@ -34,8 +45,10 @@ export const useDraftStore = create<DraftState>()(
         return {
           ...current,
           ...p,
-          design: normalizeDesign(p.design),
+          // tip is not restored, so coins never survive a reload on their own
+          design: { ...normalizeDesign(p.design), coins: false },
           visibility: p.visibility === 'public' ? 'public' : 'private',
+          tip: null,
         };
       },
     },

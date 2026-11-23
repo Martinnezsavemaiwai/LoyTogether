@@ -16,73 +16,10 @@ import {
 } from '@/lib/validation';
 import { useDraftStore } from '@/stores/draftStore';
 import { useIdentityStore } from '@/stores/identityStore';
-import type { KrathongDesign } from '@/types/domain';
-import { KrathongSvg } from './KrathongSvg';
-import { BASES, CANDLES, DECORATIONS, FLOWERS, SHAPES, type Option } from './options';
-
-const SWATCH: Record<string, string> = {
-  golden: '#f2c260',
-  white: '#fbf6ea',
-  gold: '#f5c76a',
-  purple: '#b79cff',
-  pink: '#ff9fc6',
-  marigold: '#f7a531',
-  rose: '#b8203e',
-  orchid: '#a36ee0',
-  banana_leaf: '#4e9a5d',
-  flower: '#f3c6d3',
-};
-
-function PartPicker<K extends keyof KrathongDesign>({
-  label,
-  part,
-  options,
-}: {
-  label: string;
-  part: K;
-  options: Option<KrathongDesign[K]>[];
-}) {
-  const value = useDraftStore((s) => s.design[part]);
-  const setPart = useDraftStore((s) => s.setPart);
-  return (
-    <fieldset>
-      <legend className="mb-2 text-sm text-mist">{label}</legend>
-      <div className="flex flex-wrap gap-2">
-        {options.map((option) => {
-          const selected = option.value === value;
-          const swatch = SWATCH[option.value];
-          return (
-            <label
-              key={option.value}
-              className={`relative inline-flex min-h-12 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-gold ${
-                selected
-                  ? 'border-gold bg-gold/15 text-ink'
-                  : 'border-ink/15 text-ink/80 hover:border-ink/40'
-              }`}
-            >
-              <input
-                type="radio"
-                name={part}
-                value={option.value}
-                checked={selected}
-                onChange={() => setPart(part, option.value)}
-                className="sr-only"
-              />
-              {swatch && (
-                <span
-                  aria-hidden
-                  className="size-3.5 rounded-full ring-1 ring-ink/30"
-                  style={{ background: swatch }}
-                />
-              )}
-              {option.label}
-            </label>
-          );
-        })}
-      </div>
-    </fieldset>
-  );
-}
+import { KrathongArt } from './KrathongArt';
+import { BASES, BEADS, CANDLES, FLOWERS, SHAPES } from './options';
+import { ChoicePicker, FlowerPicker, SwitchRow } from './PartPickers';
+import { TipPicker } from '@/features/tips/TipPicker';
 
 export function CreatePage() {
   const [params] = useSearchParams();
@@ -160,9 +97,11 @@ export function CreatePage() {
         wish: wish.value,
         visibility: draft.visibility,
       });
+      const tip = draft.tip;
       draft.clear();
+      draft.setPart('coins', false);
       attemptId.current = crypto.randomUUID();
-      navigate(backHref, { state: { justFloated: krathong } });
+      navigate(backHref, { state: { justFloated: krathong, tip } });
     } catch (err) {
       setErrors({ submit: errorMessage(err) });
       setSubmitting(false);
@@ -188,7 +127,7 @@ export function CreatePage() {
         </div>
         <div className="absolute inset-x-0 bottom-[4%] flex justify-center">
           <div className="lt-bob w-[min(17rem,52vw)] lg:w-[min(30rem,40vw)]">
-            <KrathongSvg
+            <KrathongArt
               design={draft.design}
               className="h-auto w-full drop-shadow-[0_18px_30px_rgb(0_0_0/0.5)]"
               title="ตัวอย่างกระทงของคุณ"
@@ -213,11 +152,22 @@ export function CreatePage() {
         <DisplayNameEditor className="mt-2" />
 
         <div className="mt-8 space-y-6">
-          <PartPicker label="ทรงกระทง" part="shape" options={SHAPES} />
-          <PartPicker label="ฐาน" part="base" options={BASES} />
-          <PartPicker label="ดอกไม้" part="flower" options={FLOWERS} />
-          <PartPicker label="เทียน" part="candle" options={CANDLES} />
-          <PartPicker label="ของประดับ" part="decoration" options={DECORATIONS} />
+          <ChoicePicker label="ทรงกระทง" name="shape" options={SHAPES} swatches={false} value={draft.design.shape} onChange={(v) => v && draft.setPart('shape', v)} />
+          <ChoicePicker label="ฐาน" name="base" options={BASES} value={draft.design.base} onChange={(v) => v && draft.setPart('base', v)} />
+          <FlowerPicker options={FLOWERS} value={draft.design.flowers} onToggle={draft.toggleFlower} />
+          <ChoicePicker label="เทียน" name="candle" options={CANDLES} value={draft.design.candle} onChange={(v) => draft.setPart('candle', v)} noneLabel="ไม่ใส่" />
+          <ChoicePicker label="ลูกปัด" name="beads" options={BEADS} value={draft.design.beads} onChange={(v) => draft.setPart('beads', v)} noneLabel="ไม่ใส่" />
+          <div className="space-y-2">
+            <SwitchRow label="ธูป 3 ดอก" checked={draft.design.incense} onChange={(v) => draft.setPart('incense', v)} />
+            <SwitchRow label="มาลัยมะลิ" hint="ร้อยรอบขอบ มีดอกกุหลาบห้อยด้านหน้า" checked={draft.design.garland} onChange={(v) => draft.setPart('garland', v)} />
+          </div>
+          <TipPicker
+            value={draft.tip}
+            onChange={(tip) => {
+              draft.setField({ tip });
+              draft.setPart('coins', tip !== null);
+            }}
+          />
         </div>
 
         <div className="mt-10 space-y-6 border-t border-ink/10 pt-8">
