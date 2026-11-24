@@ -21,7 +21,6 @@ function useSceneryKrathongs(): Krathong[] {
       roomId: 'scenery',
       ownerId: 'scenery',
       displayName: '',
-      krathongName: '',
       design: {
         shape: pick(SHAPES),
         base: pick(BASES),

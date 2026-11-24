@@ -32,7 +32,6 @@ export interface Krathong {
   roomId: string;
   ownerId: string;
   displayName: string;
-  krathongName: string;
   design: KrathongDesign;
   wishVisibility: WishVisibility;
   publicWish: string | null;
@@ -44,7 +43,6 @@ export interface FloatKrathongInput {
   id: string;
   roomId: string;
   displayName: string;
-  krathongName: string;
   design: KrathongDesign;
   wish: string;
   visibility: WishVisibility;

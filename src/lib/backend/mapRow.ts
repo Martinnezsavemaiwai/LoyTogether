@@ -6,7 +6,6 @@ export interface KrathongRow {
   room_id: string;
   owner_id: string;
   display_name: string;
-  krathong_name: string;
   design: unknown;
   wish_visibility: string;
   public_wish: string | null;
@@ -16,7 +15,7 @@ export interface KrathongRow {
 }
 
 export const KRATHONG_COLUMNS =
-  'id, room_id, owner_id, display_name, krathong_name, design, wish_visibility, public_wish, has_wish, floated_at';
+  'id, room_id, owner_id, display_name, design, wish_visibility, public_wish, has_wish, floated_at';
 
 export function mapKrathongRow(row: KrathongRow): Krathong {
   const isPublic = row.wish_visibility === 'public';
@@ -25,7 +24,6 @@ export function mapKrathongRow(row: KrathongRow): Krathong {
     roomId: row.room_id,
     ownerId: row.owner_id,
     displayName: row.display_name,
-    krathongName: row.krathong_name,
     design: normalizeDesign(row.design),
     wishVisibility: isPublic ? 'public' : 'private',
     // Defensive: never surface wish text on a private krathong, whatever the row says.

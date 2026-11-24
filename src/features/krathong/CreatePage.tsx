@@ -7,13 +7,7 @@ import { DisplayNameEditor } from '@/features/identity/DisplayNameEditor';
 import { getRiver } from '@/features/rivers/rivers';
 import type { Room } from '@/types/domain';
 import { backend, errorMessage } from '@/lib/backend';
-import {
-  charLength,
-  KRATHONG_NAME_MAX,
-  validateKrathongName,
-  validateWish,
-  WISH_MAX,
-} from '@/lib/validation';
+import { charLength, validateWish, WISH_MAX } from '@/lib/validation';
 import { useDraftStore } from '@/stores/draftStore';
 import { useIdentityStore } from '@/stores/identityStore';
 import { KrathongArt } from './KrathongArt';
@@ -47,7 +41,7 @@ export function CreatePage() {
   const draft = useDraftStore();
   const [confirming, setConfirming] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [errors, setErrors] = useState<{ name?: string; wish?: string; submit?: string }>({});
+  const [errors, setErrors] = useState<{ wish?: string; submit?: string }>({});
   // One id per attempt: a double tap or retry cannot float two krathongs.
   const attemptId = useRef<string>(crypto.randomUUID());
   const confirmRef = useRef<HTMLDivElement>(null);
@@ -67,14 +61,9 @@ export function CreatePage() {
   const wishLength = charLength(draft.wish.trim());
 
   const review = () => {
-    const name = validateKrathongName(draft.krathongName);
     const wish = validateWish(draft.wish);
-    const next = {
-      name: name.ok ? undefined : name.error,
-      wish: wish.ok ? undefined : wish.error,
-    };
-    setErrors(next);
-    if (name.ok && wish.ok) {
+    setErrors({ wish: wish.ok ? undefined : wish.error });
+    if (wish.ok) {
       setConfirming(true);
       requestAnimationFrame(() => confirmRef.current?.focus());
     }
@@ -82,9 +71,8 @@ export function CreatePage() {
 
   const float = async () => {
     if (!identity || submitting) return;
-    const name = validateKrathongName(draft.krathongName);
     const wish = validateWish(draft.wish);
-    if (!name.ok || !wish.ok) return;
+    if (!wish.ok) return;
     setSubmitting(true);
     setErrors({});
     try {
@@ -92,7 +80,6 @@ export function CreatePage() {
         id: attemptId.current,
         roomId,
         displayName: identity.displayName,
-        krathongName: name.value,
         design: draft.design,
         wish: wish.value,
         visibility: draft.visibility,
@@ -170,30 +157,6 @@ export function CreatePage() {
         </div>
 
         <div className="mt-10 space-y-6 border-t border-ink/10 pt-8">
-          <div>
-            <label htmlFor="krathong-name" className="mb-2 block text-sm text-mist">
-              ตั้งชื่อกระทง
-            </label>
-            <input
-              id="krathong-name"
-              value={draft.krathongName}
-              onChange={(e) => {
-                draft.setField({ krathongName: e.target.value });
-                setConfirming(false);
-              }}
-              maxLength={KRATHONG_NAME_MAX + 10}
-              placeholder="เช่น กระทงขอพรปีใหม่"
-              aria-invalid={Boolean(errors.name)}
-              aria-describedby={errors.name ? 'krathong-name-error' : undefined}
-              className="h-12 w-full rounded-2xl border border-ink/15 bg-surface px-4 text-ink focus:border-gold focus:outline-none"
-            />
-            {errors.name && (
-              <p id="krathong-name-error" className="mt-1.5 text-sm text-danger">
-                {errors.name}
-              </p>
-            )}
-          </div>
-
           <div>
             <div className="mb-2 flex items-baseline justify-between">
               <label htmlFor="wish" className="text-sm text-mist">
@@ -280,13 +243,13 @@ export function CreatePage() {
               role="group"
             >
               <p id="confirm-title" className="font-medium text-ink">
-                ปล่อยกระทง “{draft.krathongName.trim()}” ที่{placeName}เลยไหม
+                ปล่อยกระทงที่{placeName} เลยไหม
               </p>
               <p className="mt-1 text-sm text-mist">
                 {draft.wish.trim()
                   ? draft.visibility === 'private'
                     ? 'คำอธิษฐานเป็นความลับ คนอื่นเห็นแค่กระทง'
-                    : 'ทุกคนในที่ลอยนี้จะอ่านคำอธิษฐานของคุณได้'
+                    : 'คำอธิษฐานจะลอยขึ้นเหนือกระทงให้ทุกคนในที่ลอยนี้อ่าน'
                   : 'กระทงใบนี้ไม่มีคำอธิษฐาน'}
                 {' '}ลอยไปแล้วแก้ไม่ได้นะ
               </p>

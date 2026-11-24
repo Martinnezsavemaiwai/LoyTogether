@@ -131,7 +131,8 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
         p_id: input.id,
         p_room_id: input.roomId,
         p_display_name: input.displayName,
-        p_krathong_name: input.krathongName,
+        // Krathongs no longer have their own name; the column stays and takes ''.
+        p_krathong_name: '',
         p_design: input.design,
         p_wish: input.wish,
         p_visibility: input.visibility,

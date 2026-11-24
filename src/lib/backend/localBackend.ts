@@ -89,7 +89,6 @@ export function createLocalBackend(): Backend {
         roomId: input.roomId,
         ownerId: me.userId,
         displayName: input.displayName,
-        krathongName: input.krathongName,
         design: input.design,
         wishVisibility: input.visibility,
         publicWish: input.visibility === 'public' && wish ? wish : null,

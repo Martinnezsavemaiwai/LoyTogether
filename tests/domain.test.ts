@@ -14,7 +14,6 @@ import {
   charLength,
   generateDisplayName,
   validateDisplayName,
-  validateKrathongName,
   validateWish,
 } from '@/lib/validation';
 import type { Krathong } from '@/types/domain';
@@ -79,7 +78,7 @@ describe('text validation', () => {
   });
 
   it('strips invisible and bidi characters from names', () => {
-    expect(validateKrathongName('กระทง​‮ทอง')).toEqual({ ok: true, value: 'กระทงทอง' });
+    expect(validateDisplayName('บัว​‮ทอง')).toEqual({ ok: true, value: 'บัวทอง' });
   });
 
   it('allows an empty wish and caps it at 280 characters', () => {
@@ -146,7 +145,6 @@ const row = (overrides: Partial<KrathongRow> = {}): KrathongRow => ({
   room_id: 'r1',
   owner_id: 'u1',
   display_name: 'บัว',
-  krathong_name: 'กระทง',
   design: DEFAULT_DESIGN,
   wish_visibility: 'public',
   public_wish: 'ขอให้มีความสุข',

@@ -1,7 +1,6 @@
 import { containsBlockedWords } from './moderation';
 
 export const DISPLAY_NAME_MAX = 24;
-export const KRATHONG_NAME_MAX = 40;
 export const WISH_MAX = 280;
 
 export type ValidationResult = { ok: true; value: string } | { ok: false; error: string };
@@ -29,10 +28,6 @@ function validateName(raw: string, max: number, label: string): ValidationResult
 
 export function validateDisplayName(raw: string): ValidationResult {
   return validateName(raw, DISPLAY_NAME_MAX, 'ชื่อที่แสดง');
-}
-
-export function validateKrathongName(raw: string): ValidationResult {
-  return validateName(raw, KRATHONG_NAME_MAX, 'ชื่อกระทง');
 }
 
 /** An empty wish is allowed. Line breaks are kept, other invisible characters are removed. */

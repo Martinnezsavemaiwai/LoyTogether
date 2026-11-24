@@ -5,14 +5,13 @@ import type { KrathongDesign, KrathongFlower, WishVisibility } from '@/types/dom
 
 type DraftState = {
   design: KrathongDesign;
-  krathongName: string;
   wish: string;
   visibility: WishVisibility;
   /** Money put in the krathong for show: null none, 0 coins without an amount. Never paid or stored. */
   coinAmount: number | null;
   setPart: <K extends keyof KrathongDesign>(key: K, value: KrathongDesign[K]) => void;
   toggleFlower: (kind: KrathongFlower) => void;
-  setField: (patch: Partial<Pick<DraftState, 'krathongName' | 'wish' | 'visibility' | 'coinAmount'>>) => void;
+  setField: (patch: Partial<Pick<DraftState, 'wish' | 'visibility' | 'coinAmount'>>) => void;
   resetDesign: () => void;
   clear: () => void;
 };
@@ -22,7 +21,6 @@ export const useDraftStore = create<DraftState>()(
   persist(
     (set) => ({
       design: DEFAULT_DESIGN,
-      krathongName: '',
       wish: '',
       visibility: 'private',
       coinAmount: null,
@@ -36,7 +34,7 @@ export const useDraftStore = create<DraftState>()(
         }),
       setField: (patch) => set(patch),
       resetDesign: () => set((s) => ({ design: { ...DEFAULT_DESIGN, coins: s.coinAmount !== null } })),
-      clear: () => set({ krathongName: '', wish: '', visibility: 'private', coinAmount: null }),
+      clear: () => set({ wish: '', visibility: 'private', coinAmount: null }),
     }),
     {
       name: 'loynamkan:draft',
