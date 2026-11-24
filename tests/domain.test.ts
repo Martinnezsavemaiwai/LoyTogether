@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DESIGN, flowerPhases, isValidDesign, normalizeDesign } from '@/features/krathong/options';
+import { DEFAULT_DESIGN, flowerPhases, isValidDesign, normalizeDesign, randomDesign } from '@/features/krathong/options';
 import { RIVERS, getRiver, riverByRoomId } from '@/features/rivers/rivers';
 import {
   crossingProgress,
@@ -183,5 +183,21 @@ describe('realtime merging', () => {
       k(`k${i}`, new Date(Date.UTC(2026, 10, 24, 13, 0, i)).toISOString()),
     );
     expect(mergeKrathongs([], many)).toHaveLength(100);
+  });
+});
+
+describe('randomDesign', () => {
+  it('always returns a valid design without coins', () => {
+    for (let i = 0; i < 200; i++) {
+      const design = randomDesign();
+      expect(isValidDesign(design)).toBe(true);
+      expect(design.coins).toBe(false);
+      expect(design.flowers.length).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it('stays valid at the edges of the random source', () => {
+    expect(isValidDesign(randomDesign(() => 0))).toBe(true);
+    expect(isValidDesign(randomDesign(() => 0.999999))).toBe(true);
   });
 });

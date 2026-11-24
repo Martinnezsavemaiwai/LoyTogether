@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useReturnFocus } from '@/hooks/useReturnFocus';
 import { Flag, ImageIcon, Lock, X } from 'lucide-react';
 import { KrathongArt } from '@/features/krathong/KrathongArt';
 import { backend, errorMessage } from '@/lib/backend';
@@ -28,6 +29,8 @@ export function KrathongDetails({ krathong, isMine, onClose, onReported, onMemor
   const [myWish, setMyWish] = useState<string | null>(null);
   const [reportState, setReportState] = useState<'idle' | 'confirm' | 'sending' | 'done'>('idle');
   const [error, setError] = useState<string | null>(null);
+
+  useReturnFocus();
 
   useEffect(() => {
     closeRef.current?.focus();

@@ -5,7 +5,7 @@ import { COIN_MAX } from '@/lib/promptpay';
 /**
  * Money in the krathong, like the coins people drop into real ones. It only adds coins
  * to the krathong art: nothing is paid here. `0` means coins without a set amount.
- * Asking for real money comes later, after the krathong has floated (SupportPrompt).
+ * Real money is only ever a quiet link on the river after floating (PaySheet).
  */
 export function CoinPicker({ value, onChange }: { value: number | null; onChange: (amount: number | null) => void }) {
   const [custom, setCustom] = useState(value ? String(value) : '');
@@ -24,9 +24,12 @@ export function CoinPicker({ value, onChange }: { value: number | null; onChange
 
   return (
     <fieldset>
-      <legend className="mb-2 flex items-center gap-2 text-sm text-mist">
-        <Coins className="size-4 text-gold" aria-hidden />
-        ใส่เงินลงกระทง
+      <legend className="mb-3">
+        <span className="flex items-center gap-2 font-medium text-ink">
+          <Coins className="size-4 text-gold" aria-hidden />
+          ใส่เหรียญลงกระทง
+        </span>
+        <span className="mt-0.5 block text-sm text-mist">ใส่ไว้ในรูปกระทงเฉยๆ ไม่ได้จ่ายเงินจริง</span>
       </legend>
       <div className="flex flex-wrap gap-2">
         <label className={chip(value === null)}>

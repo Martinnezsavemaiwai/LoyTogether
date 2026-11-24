@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router';
-import { ArrowLeft, Check, Heart, Link2, Lock, Plus, Users, Waves } from 'lucide-react';
+import { ArrowLeft, Check, HandCoins, Heart, Link2, Lock, Plus, Users, Waves } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { SongButton } from '@/features/music/SongDock';
 import { getRiver, type River } from '@/features/rivers/rivers';
@@ -15,8 +15,6 @@ import { RiverScene } from './RiverScene';
 
 import { MemoryPrompt } from '@/features/memory/MemoryPrompt';
 import { PROMPTPAY_ID } from '@/lib/promptpay';
-import { SupportPrompt } from '@/features/tips/SupportPrompt';
-import { shouldAskForSupport } from '@/features/tips/supportSession';
 
 const PaySheet = lazy(() => import('@/features/tips/PaySheet').then((m) => ({ default: m.PaySheet })));
 const MemoryCardSheet = lazy(() =>
@@ -145,21 +143,24 @@ function FestivalView({ roomId, river, room }: { roomId: string; river: River; r
     () => (location.state as { justFloated?: Krathong } | null)?.justFloated ?? null,
   );
   const [toast, setToast] = useState<string | null>(justFloated ? 'กระทงของคุณลอยไปแล้ว' : null);
-  // After floating, one thing at a time: first the offer of a memory card, then, only
-  // once per session and only if the owner set up PromptPay, the ask to chip in.
-  const [after, setAfter] = useState<'none' | 'memory' | 'support' | 'paying'>('none');
+  // After floating, one thing at a time: first the krathong settles and its wish rises
+  // (watching), then the memory card is offered, and only once that is answered does
+  // the quiet link to chip in appear (done). Nothing about money ever pops up.
+  const [after, setAfter] = useState<'watching' | 'memory' | 'done' | 'paying'>(
+    justFloated ? 'watching' : 'done',
+  );
   const [cardFor, setCardFor] = useState<Krathong | null>(null);
   useEffect(() => {
     if (!justFloated) return;
-    const t = window.setTimeout(() => setAfter('memory'), 2500);
+    // Long enough to see the release and the first moments of the wish.
+    const t = window.setTimeout(() => setAfter((a) => (a === 'watching' ? 'memory' : a)), 5500);
     return () => window.clearTimeout(t);
   }, [justFloated]);
-  const afterMemory = useCallback(() => {
-    setAfter(PROMPTPAY_ID && shouldAskForSupport() ? 'support' : 'none');
-  }, []);
+  const afterMemory = useCallback(() => setAfter('done'), []);
   const closeCard = useCallback(() => {
     setCardFor(null);
-    if (after === 'memory') afterMemory();
+    // Made a card some other way while waiting? Then the offer is already answered.
+    if (after === 'memory' || after === 'watching') afterMemory();
   }, [after, afterMemory]);
   const { addLocal, removeLocal } = live;
 
@@ -222,7 +223,7 @@ function FestivalView({ roomId, river, room }: { roomId: string; river: River; r
               {room && (room.roomType === 'couple' ? <Heart className="size-4 shrink-0 text-[#ff8fb1]" aria-label="ห้องคู่" /> : <Lock className="size-4 shrink-0 text-gold" aria-label="ห้องส่วนตัว" />)}
               <span className="truncate">{title}</span>
             </h1>
-            <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-mist sm:text-sm">
+            <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-mist">
               {room && <span>{river.name}</span>}
               <span className="inline-flex items-center gap-1">
                 <Users className="size-3.5" aria-hidden />
@@ -251,43 +252,58 @@ function FestivalView({ roomId, river, room }: { roomId: string; river: River; r
         </div>
       </header>
 
-      {backend.mode === 'local' && (
-        <p className="absolute inset-x-0 bottom-28 z-[140] mx-auto w-fit max-w-[90%] rounded-full bg-violet/20 px-4 py-1.5 text-center text-xs text-ink backdrop-blur-sm">
-          โหมดทดลอง ยังไม่ได้ต่อเซิร์ฟเวอร์ กระทงจะเห็นแค่ในเบราว์เซอร์นี้
-        </p>
-      )}
-
-      {live.loading && live.krathongs.length === 0 && (
-        <p className="absolute inset-x-0 top-[62%] z-[120] text-center text-mist" role="status">
-          กำลังมองหากระทงบนน้ำ
-        </p>
-      )}
-
-      {!live.loading && live.error && live.krathongs.length === 0 && (
-        <div className="absolute inset-x-0 top-[58%] z-[120] flex flex-col items-center gap-3 px-6 text-center">
-          <p className="text-ink">{live.error}</p>
-          <Button variant="ghost" onClick={() => void live.refresh()}>
-            โหลดใหม่
-          </Button>
+      {/* Status over the water sits on its own dark plate: every venue has bright
+          reflections somewhere, so bare text over the scene is never safe. */}
+      {live.krathongs.length === 0 && (
+        <div className="absolute inset-x-0 bottom-[calc(9.5rem+env(safe-area-inset-bottom))] z-[120] flex justify-center px-4">
+          <div className="lt-rise w-full max-w-sm rounded-3xl border border-ink/10 bg-night/80 px-6 py-5 text-center shadow-[0_18px_40px_-16px_rgb(0_0_0/0.8)] backdrop-blur-md">
+            {live.loading ? (
+              <p className="text-mist" role="status">
+                กำลังมองหากระทงบนน้ำ
+              </p>
+            ) : live.error ? (
+              <div className="flex flex-col items-center gap-3">
+                <p className="text-ink">{live.error}</p>
+                <Button variant="ghost" onClick={() => void live.refresh()}>
+                  โหลดใหม่
+                </Button>
+              </div>
+            ) : (
+              <>
+                <p className="text-xl font-semibold text-ink">น้ำยังนิ่งอยู่เลย</p>
+                <p className="mt-1.5 text-ink/80">
+                  {room ? 'ลอยใบแรกของห้องนี้ได้เลย' : 'ลอยใบแรกของคืนนี้ แล้วทุกคนที่เข้ามาจะเห็นกระทงของคุณ'}
+                </p>
+              </>
+            )}
+          </div>
         </div>
       )}
 
-      {!live.loading && !live.error && live.krathongs.length === 0 && (
-        <div className="absolute inset-x-0 top-[58%] z-[120] px-6 text-center">
-          <p className="text-2xl font-semibold text-ink">น้ำยังนิ่งอยู่เลย</p>
-          <p className="mt-2 text-mist">
-            {room ? 'ลอยใบแรกของห้องนี้ได้เลย' : 'ลอยใบแรกของคืนนี้ แล้วทุกคนที่เข้ามาจะเห็นกระทงของคุณ'}
-          </p>
-        </div>
-      )}
 
       {room?.roomType === 'couple' && <CoupleMoment krathongs={live.krathongs} />}
 
-      <div className="absolute inset-x-0 bottom-0 z-[150] flex justify-center bg-gradient-to-t from-night/85 to-transparent px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-10">
+      {/* The gradient band lets taps through to krathongs behind it; only its controls catch them. */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[150] flex flex-col items-center gap-1 bg-gradient-to-t from-night/85 to-transparent px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-10 [&>*]:pointer-events-auto">
+        {backend.mode === 'local' && (
+          <p className="mb-2 w-fit max-w-full rounded-2xl bg-night/75 px-4 py-1.5 text-center text-xs text-ink/85 backdrop-blur-sm [text-wrap:balance]">
+            โหมดทดลอง ยังไม่ได้ต่อเซิร์ฟเวอร์ กระทงจะเห็นแค่ในเบราว์เซอร์นี้
+          </p>
+        )}
         <Button onClick={() => navigate(createHref)} className="px-8 text-lg">
           <Plus className="size-5" aria-hidden />
-          ประกอบกระทงของคุณ
+          {justFloated ? 'ลอยอีกใบ' : 'ประกอบกระทงของคุณ'}
         </Button>
+        {justFloated && PROMPTPAY_ID && after === 'done' && !cardFor && (
+          <button
+            type="button"
+            onClick={() => setAfter('paying')}
+            className="inline-flex min-h-11 items-center gap-1.5 px-3 text-sm text-ink/70 underline decoration-ink/30 underline-offset-4 hover:text-gold"
+          >
+            <HandCoins className="size-4" aria-hidden />
+            ช่วยค่าดูแลเว็บ ให้เท่าไหร่ก็ได้
+          </button>
+        )}
       </div>
 
       {toast && (
@@ -307,12 +323,9 @@ function FestivalView({ roomId, river, room }: { roomId: string; river: River; r
           <MemoryCardSheet krathong={cardFor} river={river} placeTitle={room?.title} onClose={closeCard} />
         </Suspense>
       )}
-      {after === 'support' && !selected && !cardFor && (
-        <SupportPrompt onAccept={() => setAfter('paying')} onDismiss={() => setAfter('none')} />
-      )}
       {after === 'paying' && !selected && (
         <Suspense fallback={null}>
-          <PaySheet onClose={() => setAfter('none')} />
+          <PaySheet onClose={() => setAfter('done')} />
         </Suspense>
       )}
 

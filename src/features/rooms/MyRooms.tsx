@@ -90,7 +90,7 @@ function RoomItem({ room, onClosed }: { room: Room; onClosed: () => void }) {
         to={`/room/${room.id}`}
         className="group flex min-h-16 items-center gap-4 px-4 py-3 text-ink no-underline transition-colors hover:text-gold"
       >
-        <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-gold/10 text-gold">
+        <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-violet/12 text-violet">
           <Icon className="size-5" aria-hidden />
         </span>
         <span className="min-w-0 flex-1">

@@ -68,6 +68,11 @@ a {
   text-underline-offset: 0.2em;
 }
 
+/* Playfair is for numerals and Latin accents; its default old-style figures read as subscripts in Thai text. */
+.font-display {
+  font-variant-numeric: lining-nums;
+}
+
 /* ---------- Atmosphere ---------- */
 
 @keyframes lt-twinkle {
@@ -340,6 +345,24 @@ a {
   animation: lt-ripple 2.2s ease-out both;
 }
 
+/* Builder: the krathong is lowered onto the water and drifts off before the river opens. */
+@keyframes lt-launch {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  30% {
+    transform: translateY(6%) scale(0.98);
+  }
+  100% {
+    transform: translate(18%, 4%) scale(0.72);
+    opacity: 0.85;
+  }
+}
+
+.lt-launch {
+  animation: lt-launch 1.1s var(--ease-out-expo) both;
+}
+
 /* Name tag: tied to the krathong at the waterline, it bobs and drifts with it. */
 .lt-nametag {
   position: absolute;
@@ -508,6 +531,7 @@ a {
   }
   .lt-release,
   .lt-ripple,
+  .lt-launch,
   .lt-rise {
     animation-duration: 1ms;
   }

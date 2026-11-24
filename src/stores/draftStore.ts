@@ -11,6 +11,8 @@ type DraftState = {
   coinAmount: number | null;
   setPart: <K extends keyof KrathongDesign>(key: K, value: KrathongDesign[K]) => void;
   toggleFlower: (kind: KrathongFlower) => void;
+  /** Replace the whole design at once, e.g. a random one. */
+  setDesign: (design: KrathongDesign) => void;
   setField: (patch: Partial<Pick<DraftState, 'wish' | 'visibility' | 'coinAmount'>>) => void;
   resetDesign: () => void;
   clear: () => void;
@@ -32,6 +34,7 @@ export const useDraftStore = create<DraftState>()(
           const flowers = has ? s.design.flowers.filter((f) => f !== kind) : [...s.design.flowers, kind];
           return { design: { ...s.design, flowers } };
         }),
+      setDesign: (design) => set({ design }),
       setField: (patch) => set(patch),
       resetDesign: () => set((s) => ({ design: { ...DEFAULT_DESIGN, coins: s.coinAmount !== null } })),
       clear: () => set({ wish: '', visibility: 'private', coinAmount: null }),

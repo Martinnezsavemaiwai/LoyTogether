@@ -76,7 +76,7 @@ export function LandingPage() {
             className="lt-rise mt-3 max-w-[32rem] text-lg text-ink/90 sm:text-xl"
             style={{ '--delay': '0.15s' } as React.CSSProperties}
           >
-            คืนวันเพ็ญ 24 พฤศจิกายน 2569 มาลอยกระทงออนไลน์ไปพร้อมกัน
+            คืนวันเพ็ญ <span className="font-display">24</span> พฤศจิกายน <span className="font-display">2569</span> มาลอยกระทงออนไลน์ไปพร้อมกัน
             อยู่ไกลกันแค่ไหนก็ลอยสายน้ำเดียวกันได้
           </p>
           <div

@@ -5,7 +5,10 @@ import { Button } from '@/components/ui/Button';
 export function MemoryPrompt({ onAccept, onDismiss }: { onAccept: () => void; onDismiss: () => void }) {
   return (
     <aside
+      role="dialog"
+      aria-modal="false"
       aria-labelledby="memory-ask-title"
+      aria-describedby="memory-ask-desc"
       className="lt-rise fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-[205] rounded-[1.75rem] border border-gold/30 bg-surface/95 p-5 shadow-[0_18px_50px_-12px_rgb(0_0_0/0.7)] backdrop-blur-md sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-[23rem]"
     >
       <div className="flex items-start gap-3">
@@ -14,7 +17,7 @@ export function MemoryPrompt({ onAccept, onDismiss }: { onAccept: () => void; on
           <h2 id="memory-ask-title" className="font-semibold text-ink">
             เก็บกระทงใบนี้ไว้เป็นการ์ดไหม
           </h2>
-          <p className="mt-1 text-sm leading-relaxed text-mist">ได้รูปกระทงของคุณกับที่ลอยคืนนี้ ไว้ดูเองหรือส่งให้เพื่อน</p>
+          <p id="memory-ask-desc" className="mt-1 text-sm leading-relaxed text-mist">ได้รูปกระทงของคุณกับที่ลอยคืนนี้ ไว้ดูเองหรือส่งให้เพื่อน</p>
         </div>
         <button
           type="button"

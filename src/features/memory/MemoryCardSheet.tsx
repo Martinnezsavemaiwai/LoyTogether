@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useReturnFocus } from '@/hooks/useReturnFocus';
 import { Download, Share2, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import type { River } from '@/features/rivers/rivers';
@@ -27,6 +28,8 @@ export function MemoryCardSheet({
   useEffect(() => () => {
     if (url) URL.revokeObjectURL(url);
   }, [url]);
+
+  useReturnFocus();
 
   useEffect(() => {
     closeRef.current?.focus();

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useReturnFocus } from '@/hooks/useReturnFocus';
 import { Download, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { PROMPTPAY_ID, PROMPTPAY_NAME, promptPayPayload } from '@/lib/promptpay';
@@ -13,6 +14,8 @@ export function PaySheet({ onClose }: { onClose: () => void }) {
   const [renderFailed, setRenderFailed] = useState(false);
   const failed = !payload || renderFailed;
   const closeRef = useRef<HTMLButtonElement>(null);
+
+  useReturnFocus();
 
   useEffect(() => {
     closeRef.current?.focus();

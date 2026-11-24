@@ -63,6 +63,28 @@ export const DEFAULT_DESIGN: KrathongDesign = {
   coins: false,
 };
 
+/** A ready-made krathong for visitors who would rather not choose every part. */
+export function randomDesign(rand: () => number = Math.random): KrathongDesign {
+  const pick = <T,>(list: readonly T[]): T => list[Math.floor(rand() * list.length) % list.length]!;
+  const pool = FLOWERS.map((f) => f.value);
+  const flowers: KrathongFlower[] = [];
+  const count = 1 + Math.floor(rand() * MAX_FLOWERS);
+  while (flowers.length < count) {
+    const kind = pick(pool.filter((f) => !flowers.includes(f)));
+    flowers.push(kind);
+  }
+  return {
+    shape: pick(SHAPES).value,
+    base: pick(BASES).value,
+    flowers,
+    candle: pick(CANDLES).value,
+    incense: rand() < 0.7,
+    beads: rand() < 0.75 ? pick(BEADS).value : null,
+    garland: rand() < 0.35,
+    coins: false,
+  };
+}
+
 const values = <T extends string>(list: Option<T>[]) => list.map((o) => o.value) as readonly T[];
 const SHAPE_V = values(SHAPES);
 const BASE_V = values(BASES);

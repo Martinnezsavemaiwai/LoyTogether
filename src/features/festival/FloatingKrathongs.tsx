@@ -216,7 +216,7 @@ export function FloatingKrathongs({
   const { showing, register, onWishDone } = useWishRotation(krathongs, justFloatedId, rootRef);
 
   return (
-    <div ref={rootRef} className={`absolute inset-x-0 top-[53%] bottom-[16%] ${className}`}>
+    <div ref={rootRef} className={`absolute inset-x-0 top-[50%] bottom-[24%] sm:top-[53%] sm:bottom-[16%] ${className}`}>
       {krathongs.map((k) => (
         <FloatingItem
           key={k.id}
