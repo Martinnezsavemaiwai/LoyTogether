@@ -155,9 +155,11 @@ export async function renderMemoryCard({ krathong, river, placeTitle, host }: Me
   };
   const textWidth = CARD_W - SIDE * 2;
 
+  // The person's name heads the card; krathongs no longer carry a name of their own.
+  const name = krathong.displayName;
   let nameSize = 64;
-  while (nameSize > 40 && measureAt(nameSize, 600)(krathong.krathongName) > textWidth) nameSize -= 4;
-  const nameLines = wrapText(krathong.krathongName, textWidth, measureAt(nameSize, 600)).slice(0, 2);
+  while (nameSize > 40 && measureAt(nameSize, 600)(name) > textWidth) nameSize -= 4;
+  const nameLines = wrapText(name, textWidth, measureAt(nameSize, 600)).slice(0, 2);
 
   const wish = krathong.publicWish?.trim() || null;
   let wishSize = 34;
@@ -174,7 +176,7 @@ export async function renderMemoryCard({ krathong, river, placeTitle, host }: Me
   const footerY = CARD_H - 64;
   const nameLine = nameSize * 1.3;
   const wishLine = wishSize * 1.55;
-  const byGap = 52;
+  const byGap = 12;
   const blockHeight = nameLines.length * nameLine + byGap + (wishLines.length ? 36 + wishLines.length * wishLine : 0);
   const blockBottom = footerY - 110;
   const blockTop = blockBottom - blockHeight;
@@ -233,9 +235,6 @@ export async function renderMemoryCard({ krathong, river, placeTitle, host }: Me
     ctx.fillText(line, CARD_W / 2, y - nameLine * 0.22);
   }
   y += byGap;
-  ctx.fillStyle = MIST;
-  ctx.font = `400 30px ${FONT}`;
-  ctx.fillText(`ลอยโดย ${krathong.displayName}`, CARD_W / 2, y - 14);
   if (wishLines.length) {
     y += 36;
     ctx.fillStyle = INK;

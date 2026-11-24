@@ -94,7 +94,7 @@ export function MemoryCardSheet({
 
       <div className="mx-auto mt-4 aspect-[4/5] w-full max-w-[18rem] overflow-hidden rounded-2xl bg-night ring-1 ring-ink/10">
         {url ? (
-          <img src={url} alt={`การ์ดกระทง ${krathong.krathongName}`} className="block h-full w-full" />
+          <img src={url} alt={`การ์ดกระทงของ ${krathong.displayName}`} className="block h-full w-full" />
         ) : failed ? (
           <p className="flex h-full items-center justify-center p-6 text-center text-danger">
             ทำการ์ดไม่สำเร็จ ลองปิดแล้วเปิดใหม่อีกครั้งนะ

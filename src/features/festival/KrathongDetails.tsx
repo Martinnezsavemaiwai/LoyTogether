@@ -103,10 +103,10 @@ export function KrathongDetails({ krathong, isMine, onClose, onReported, onMemor
         <KrathongArt design={krathong.design} lit={false} className="w-24 shrink-0" />
         <div className="min-w-0 flex-1">
           <h2 id="krathong-detail-title" className="break-words text-xl font-semibold text-ink">
-            {krathong.krathongName}
+            {krathong.displayName}
           </h2>
           <p className="mt-0.5 break-words text-sm text-mist">
-            {krathong.displayName} ลอยไว้{timeAgo(krathong.floatedAt)}
+            {isMine ? 'กระทงของคุณ ' : ''}ลอยไว้{timeAgo(krathong.floatedAt)}
           </p>
         </div>
         <button
