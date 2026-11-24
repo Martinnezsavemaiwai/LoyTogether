@@ -340,6 +340,136 @@ a {
   animation: lt-ripple 2.2s ease-out both;
 }
 
+/* Name tag: tied to the krathong at the waterline, it bobs and drifts with it. */
+.lt-nametag {
+  position: absolute;
+  left: 50%;
+  top: calc(100% - 0.5rem);
+  translate: -50% 0;
+  max-width: 9.5em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.05em 0.75em 0.15em;
+  border-radius: 999px;
+  border: 1px solid rgb(255 249 236 / 0.12);
+  background: rgb(9 13 28 / 0.72);
+  color: var(--color-ink);
+  font-weight: 500;
+  line-height: 1.5;
+  backdrop-filter: blur(3px);
+}
+
+.lt-nametag-mine {
+  color: var(--color-gold);
+  border-color: rgb(245 199 106 / 0.5);
+  background: rgb(26 22 12 / 0.82);
+}
+
+/* A small flame marks the visitor's own krathong. */
+.lt-nametag-mine::before {
+  content: '';
+  display: inline-block;
+  width: 0.4em;
+  height: 0.4em;
+  margin-right: 0.45em;
+  vertical-align: 0.15em;
+  border-radius: 50%;
+  background: var(--color-gold);
+  box-shadow: 0 0 0.4em rgb(245 199 106 / 0.9);
+}
+
+/* Public wish: rises from the candle, holds, then drifts up and fades. */
+@keyframes lt-wish {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  10% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  84% {
+    opacity: 1;
+    transform: translateY(-8px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-24px);
+  }
+}
+
+@keyframes lt-wish-fade {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  8%,
+  90% {
+    opacity: 1;
+  }
+}
+
+.lt-wish {
+  position: absolute;
+  left: 50%;
+  bottom: 84%;
+  translate: -50% 0;
+  width: min(13.5rem, 70vw);
+  pointer-events: none;
+  text-align: center;
+  animation: lt-wish 7.5s ease-out both;
+}
+
+.lt-wish-own {
+  animation-duration: 9.5s;
+}
+
+.lt-wish-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  padding: 0.5rem 0.75rem;
+  border-radius: 1rem;
+  background: radial-gradient(ellipse at 50% 55%, rgb(20 27 50 / 0.9) 35%, rgb(20 27 50 / 0) 75%);
+  color: var(--color-ink);
+  font-size: 0.875rem;
+  line-height: 1.55;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.9), 0 2px 10px rgb(9 13 28 / 0.8);
+}
+
+.lt-wish-own .lt-wish-text {
+  -webkit-line-clamp: 3;
+}
+
+.lt-wish-text::before {
+  content: '“';
+  color: var(--color-gold);
+}
+
+.lt-wish-text::after {
+  content: '”';
+  color: var(--color-gold);
+}
+
+/* A thin thread of light back down to the flame. */
+.lt-wish-thread {
+  display: block;
+  width: 1px;
+  height: 1.25rem;
+  margin: 0.25rem auto 0;
+  background: linear-gradient(rgb(245 199 106 / 0), rgb(245 199 106 / 0.7));
+}
+
+@media (min-width: 768px) {
+  .lt-wish-text {
+    font-size: 0.9375rem;
+  }
+}
+
 /* ---------- Page transitions ---------- */
 
 @keyframes lt-rise {
@@ -380,6 +510,11 @@ a {
   .lt-ripple,
   .lt-rise {
     animation-duration: 1ms;
+  }
+  /* Wishes still take turns, but appear and fade in place. */
+  .lt-wish {
+    animation-name: lt-wish-fade;
+    animation-timing-function: linear;
   }
 }
 
