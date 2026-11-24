@@ -43,6 +43,7 @@ npm run build
    4. `supabase/migrations/20261123000004_multi_parts_moderation.sql` (เลือกส่วนประกอบได้หลายชิ้นต่อหมวด ตัวกรองคำแยกไทยกับอังกฤษ และจำกัดการรายงาน)
    5. `supabase/migrations/20261123000005_sukhothai_title.sql` (เปลี่ยนชื่อห้องสุโขทัยเป็นหน้าวัดมหาธาตุ ให้ตรงกับฉาก)
    6. `supabase/migrations/20261123000006_close_room.sql` (ให้คนเปิดห้องปิดห้องก่อนครบ 3 วันได้ ต้องรันก่อน deploy ไม่อย่างนั้นปุ่มปิดห้องจะใช้ไม่ได้)
+   7. `supabase/migrations/20261124000001_optional_krathong_name.sql` (เลิกบังคับชื่อกระทง ต้องรันก่อน deploy ไม่อย่างนั้นจะลอยกระทงไม่ได้)
 
    รายการคำใน `contains_blocked_words` ของไฟล์ 004 ต้องตรงกับ `src/lib/moderation.ts` เสมอ มี test คอยเช็ก ถ้าแก้ฝั่งหนึ่งต้องแก้อีกฝั่งด้วย
 
