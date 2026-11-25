@@ -1059,25 +1059,106 @@ def incense(coll, top):
         obj(f"Ember{i}", uv_sphere(0.0018, 8, 6), ember, coll, loc=tip)
 
 
-BEAD_MAT = {
-    "gold": lambda: principled("BeadGold", (0.9, 0.65, 0.2), rough=0.2, metallic=1.0),
-    "purple": lambda: principled("BeadPurple", (0.45, 0.25, 0.85), rough=0.15, coat=1.0),
-    "pink": lambda: principled("BeadPink", (0.95, 0.4, 0.65), rough=0.15, coat=1.0),
-    "pearl": lambda: principled("Pearl", (0.95, 0.93, 0.88), rough=0.12, coat=1.0, sss=0.2),
+def _bead_mat(name, color, rough, metallic=0.0, transmission=0.0, ior=1.5, coat=0.0, film=0.0, sheen=0.0):
+    m = principled(name, color, rough=rough, metallic=metallic, transmission=transmission, ior=ior, coat=coat)
+    b = next(n for n in m.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+    b.inputs["Thin Film Thickness"].default_value = film  # nm; the rainbow sheen of nacre
+    b.inputs["Thin Film IOR"].default_value = 1.4
+    b.inputs["Sheen Weight"].default_value = sheen
+    return m
+
+
+# Each colour is a different kind of bead, as sold for krathong: (main bead, spacer, main shape)
+BEAD_KINDS = {
+    "pearl": (lambda: _bead_mat("Pearl2", (0.94, 0.91, 0.85), 0.16, coat=1.0, film=420, sheen=0.25),
+              lambda: _bead_mat("Pearl2", (0.94, 0.91, 0.85), 0.16, coat=1.0, film=420, sheen=0.25), "round"),
+    "gold": (lambda: _bead_mat("BeadGold2", (1.0, 0.74, 0.32), 0.16, metallic=1.0),
+             lambda: _bead_mat("BeadGoldSpacer", (1.0, 0.7, 0.28), 0.3, metallic=1.0), "round"),
+    "purple": (lambda: _bead_mat("CrystalPurple2", (0.42, 0.12, 0.9), 0.02, transmission=0.65, ior=1.56, coat=1.0, film=250),
+               lambda: _bead_mat("BeadSilver", (0.92, 0.92, 0.95), 0.2, metallic=1.0), "facet"),
+    "pink": (lambda: _bead_mat("CrystalPink2", (1.0, 0.3, 0.6), 0.02, transmission=0.65, ior=1.56, coat=1.0, film=250),
+             lambda: _bead_mat("BeadSilver", (0.92, 0.92, 0.95), 0.2, metallic=1.0), "facet"),
 }
 
 
+def bead_bm(r, kind):
+    """round: a smooth bead; facet: a cut-crystal bicone; spacer: a flat rondelle."""
+    if kind == "round":
+        return uv_sphere(r, 16, 10)
+    if kind == "facet":
+        return lathe_bm([(0.0, -r * 0.95), (r * 0.62, -r * 0.45), (r, 0.0), (r * 0.62, r * 0.45), (0.0, r * 0.95)], seg=8)
+    return scaled(uv_sphere(r, 12, 8), 1, 1, 0.55)
+
+
+def bead_path(pts, closed, sizes, gap=0.0004):
+    """Walk the polyline placing beads end to end, cycling through `sizes` (radii).
+    Returns (position, tangent, index into sizes)."""
+    loop = pts + pts[:1] if closed else pts
+    seg = [(loop[i], loop[i + 1]) for i in range(len(loop) - 1)]
+    total = sum((b - a).length for a, b in seg)
+    out, d, k = [], 0.0, 0
+    while True:
+        r = sizes[k % len(sizes)]
+        d += r
+        if d > total - (r if closed else 0):
+            break
+        acc = 0.0
+        for a, b in seg:
+            L = (b - a).length
+            if acc + L >= d:
+                out.append((a + (b - a) * ((d - acc) / L), (b - a).normalized(), k % len(sizes)))
+                break
+            acc += L
+        d += r + gap
+        k += 1
+    return out
+
+
+def bead_strand(name, path, pick, kinds, thread_mat):
+    """Beads along a path with the thread showing in the gaps between them."""
+    main, spacer, shape = kinds
+    prev = None
+    for i, (p, t, which) in enumerate(path):
+        r, mat, kind = (which[0], main(), shape) if which[1] == "main" else (which[0], spacer(), "spacer")
+        frame = Matrix.Translation(p) @ t.to_track_quat("Z", "Y").to_matrix().to_4x4()
+        place(f"{name}_{i}", bead_bm(r, kind), mat, pick(p), frame)
+        if prev is not None:
+            d = p - prev
+            if d.length > 1e-5:
+                place(f"{name}_t{i}", lathe_bm([(0.00035, 0), (0.00035, d.length)], seg=6), thread_mat, pick((p + prev) / 2),
+                      Matrix.Translation(prev) @ d.to_track_quat("Z", "Y").to_matrix().to_4x4())
+        prev = p
+
+
 def beads(colour, shape, front, back, top):
-    m = BEAD_MAT[colour]()
-    for i, (x, y) in enumerate(shape_outline(shape, 30)):
-        obj(f"Bead_{shape}_{colour}_{i}", uv_sphere(0.0042, 12, 8), m, back if y > 0 else front,
-            loc=(x * R * 0.87, y * R * 0.87, top + 0.003))
-    for i in range(34):  # a strand swagged across the front
-        u = i / 33
-        x = -R * 0.9 + u * R * 1.8
-        y = -R * 0.62 - math.sin(u * math.pi) * R * 0.2
-        z = top - 0.006 - math.sin(u * math.pi) * 0.018
-        obj(f"Strand_{shape}_{colour}_{i}", uv_sphere(0.0028, 10, 6), m, front, loc=(x, y, z))
+    """A strand of beads laid round the rim, a second strand swagged across the front, and a
+    drop hanging from its lowest point. Main beads alternate with small spacers on a thread,
+    each a hair different in size, as a hand-strung strand is."""
+    kinds = BEAD_KINDS[colour]
+    thread = principled("BeadThread", (0.85, 0.78, 0.55), rough=0.5)
+    rnd = random.Random(hash(colour) & 0xffff)
+    side = lambda p: back if p.y > 0 else front
+    rim = [Vector((x * R * 0.87, y * R * 0.87, top + 0.0032)) for x, y in shape_outline(shape, 200)]
+    pattern = [(0.0052, "main"), (0.0022, "spacer")]
+    path = [(p, t, (pattern[w][0] * rnd.uniform(0.94, 1.06), pattern[w][1])) for p, t, w in bead_path(rim, True, [s for s, _ in pattern])]
+    bead_strand(f"Bead_{shape}_{colour}", path, side, kinds, thread)
+    swag = []
+    for i in range(120):
+        u = i / 119
+        swag.append(Vector((-R * 0.9 + u * R * 1.8, -R * 0.62 - math.sin(u * math.pi) * R * 0.2,
+                            top - 0.006 - math.sin(u * math.pi) * 0.018)))
+    pattern = [(0.0036, "main"), (0.0016, "spacer")]
+    path = [(p, t, (pattern[w][0] * rnd.uniform(0.94, 1.06), pattern[w][1])) for p, t, w in bead_path(swag, False, [s for s, _ in pattern])]
+    bead_strand(f"Strand_{shape}_{colour}", path, lambda p: front, kinds, thread)
+    # the drop: three small beads and a larger one hanging under the middle of the swag
+    low = swag[len(swag) // 2]
+    drop = [(low + Vector((0, 0, -0.0042)), 0.0016, "spacer"), (low + Vector((0, 0, -0.0078)), 0.0026, "main"),
+            (low + Vector((0, 0, -0.0114)), 0.0016, "spacer"), (low + Vector((0, 0, -0.0172)), 0.0044, "main")]
+    down = Vector((0, 0, -1))
+    path = [(p, down, (r, w)) for p, r, w in drop]
+    bead_strand(f"Drop_{shape}_{colour}", path, lambda p: front, kinds, thread)
+    place(f"DropThread_{shape}_{colour}", lathe_bm([(0.00035, 0), (0.00035, 0.0042)], seg=6), thread, front,
+          Matrix.Translation(drop[0][0]))
 
 
 def malai_rope(name, pts, pick, bud, accent, every=9, per=4):
