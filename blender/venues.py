@@ -917,6 +917,74 @@ def redented_lathe(name, profile, loc, material, corners=5, notch=0.86):
     return mesh_ob(name, bm, material, loc=loc)
 
 
+def chofa(name, x, y, z, size, material, flip=1):
+    """The slim horn at the end of a Thai temple ridge: rises, then hooks outward."""
+    pts = [(0.0, 0.0), (0.05, 0.4), (0.18, 0.75), (0.42, 0.95), (0.62, 0.92)]
+    for k, ((x0, z0), (x1, z1)) in enumerate(zip(pts, pts[1:])):
+        L = math.hypot(x1 - x0, z1 - z0) * size
+        ob = box(f"{name}_{k}", 0.16 * size, 0.16 * size, L, (x + x0 * size * flip, y, z + z0 * size), material)
+        ob.rotation_euler = (0, math.atan2((x1 - x0) * flip, z1 - z0), 0)
+
+
+def thai_roof(name, x, y, z, w, d, tiers, tile, gold, pitch=0.62):
+    """A Thai temple roof: steep gables stacked in tiers, each tier lower roof flaring out
+    under the one above, gable end toward the viewer with a gold chofa on its peak and a
+    lit line along every eave."""
+    top = z
+    for k in range(tiers):
+        tw, td = w * (1 - 0.2 * k), d * (1 - 0.1 * k)
+        h = tw * pitch / 2
+        prism_roof(f"{name}T{k}", tw, td, h, (x, y, top), tile, overlap_ok(k))
+        box(f"{name}Eave{k}", tw * 1.16, 0.25, 0.25, (x, y - td / 2 - 0.1, top - 0.1), gold)
+        top += h * 0.55
+    peak = top + w * (1 - 0.2 * (tiers - 1)) * pitch / 2 * 0.45
+    chofa(name + "Chofa", x, y - d * (1 - 0.1 * (tiers - 1)) / 2, peak - 0.3, w * 0.09, gold)
+    return peak
+
+
+def overlap_ok(k):
+    return 1.15 + 0.05 * k
+
+
+def thai_hall(name, x, y, w, d, h, tiers, wall, tile, gold):
+    """An ordination hall or riverside sala: white columns on a lit plinth, a Thai roof."""
+    box(name + "Plinth", w * 1.05, d * 1.05, h * 0.18, (x, y, 0), wall)
+    box(name + "Body", w * 0.86, d * 0.9, h * 0.82, (x, y, h * 0.18), wall)
+    for i in range(6):
+        cx = x - w / 2 + w * (i + 0.5) / 6
+        box(f"{name}Col{i}", w * 0.05, w * 0.05, h * 0.82, (cx, y - d / 2 + 0.2, h * 0.18), wall)
+    return thai_roof(name + "Roof", x, y, h, w, d, tiers, tile, gold)
+
+
+def city_tower(name, x, y, w, d, h, rnd, glass, beacon, crown):
+    """A Bangkok office or condo tower: setbacks near the top, and one of a few crowns:
+    a lit parapet, a stepped crown, a spire, or a coloured LED band."""
+    box(name, w, d, h, (x, y, 0), glass)
+    z = h
+    for k in range(rnd.choice((0, 1, 2))):  # setbacks
+        w2, d2 = w * (0.82 - 0.1 * k), d * (0.82 - 0.1 * k)
+        hh = rnd.uniform(6, 14)
+        box(f"{name}Set{k}", w2, d2, hh, (x, y, z), glass)
+        z += hh
+        w, d = w2, d2
+    style = rnd.choice(("parapet", "steps", "spire", "band", "parapet"))
+    if style == "parapet":
+        box(name + "Crown", w * 1.02, d * 1.02, 1.2, (x, y, z), crown)
+    elif style == "steps":
+        for k in range(3):
+            box(f"{name}Step{k}", w * (0.7 - 0.18 * k), d * (0.7 - 0.18 * k), 4, (x, y, z + k * 4), crown)
+        z += 12
+    elif style == "spire":
+        lathe(name + "Spire", [(w * 0.08, 0), (0.15, h * 0.18)], (x, y, z), crown, segments=6)
+        z += h * 0.18
+    else:
+        band = mat(f"Band{name}", (1, 1, 1), emit=rnd.choice(((0.3, 0.5, 1.0), (0.7, 0.3, 1.0), (0.2, 0.9, 1.0))), strength=6)
+        box(name + "Band", w * 1.01, d * 1.01, 2.2, (x, y, z - 6), band)
+    if h > 90:
+        sphere(name + "Beacon", 0.9, (x, y, z + 1.5), beacon, subdiv=1)
+    return z
+
+
 def wat_arun_prang(name, x, y, height, material, z0=0.0, slim=1.0):
     """The Khmer-derived prang of Wat Arun: a tall body that swells slightly above its
     base and narrows in a long convex curve, ringed by many shallow tiers (the
@@ -937,6 +1005,7 @@ def wat_arun_prang(name, x, y, height, material, z0=0.0, slim=1.0):
     prof += [(tip_r * 0.6, body + height * 0.02), (tip_r * 0.35, body + height * 0.1),
              (tip_r * 0.12, height * 0.97), (0.0, height)]
     redented_lathe(name, prof, (x, y, z0), material, corners=5, notch=0.82)
+    return prof
 
 
 def terrace(name, x, y, w, h, material, rail=None, corners=5):
@@ -967,6 +1036,43 @@ def seated_buddha(name, x, y, z, h, material):
           (x, y, z + h * 0.22), material, segments=16, smooth=True)
     sphere(name + "Head", h * 0.1, (x, y, z + h * 0.72), material, scale=(0.9, 0.9, 1.2), subdiv=3)
     lathe(name + "Flame", [(h * 0.04, 0), (h * 0.03, h * 0.08), (0, h * 0.2)], (x, y, z + h * 0.8), material, segments=8)
+
+
+def gold_standing_buddha(name, x, y, h, gold, halo):
+    """Luang Pho Yai of Wat Burapha: a tall gilded standing Buddha, robe falling to a
+    flared hem, arms at the sides, a soft glow round the head from the floodlights."""
+    lathe(name + "Plinth", [(h * 0.2, 0), (h * 0.2, h * 0.05), (h * 0.15, h * 0.07), (h * 0.15, h * 0.1)],
+          (x, y, 0), gold, segments=16)
+    lathe(name + "Lotus", [(h * 0.11, 0), (h * 0.14, h * 0.02), (h * 0.1, h * 0.035)], (x, y, h * 0.1), gold, segments=16)
+    lathe(name + "Robe", [(h * 0.1, 0), (h * 0.085, h * 0.05), (h * 0.08, h * 0.3), (h * 0.09, h * 0.52),
+                          (h * 0.085, h * 0.62), (h * 0.05, h * 0.7)], (x, y, h * 0.135), gold, segments=20, smooth=True)
+    for side in (-1, 1):  # arms down the sides of the robe
+        ob = lathe(f"{name}Arm{side}", [(h * 0.022, 0), (h * 0.02, h * 0.3)], (x + side * h * 0.095, y, h * 0.5), gold,
+                   segments=8, smooth=True)
+        ob.rotation_euler = (0, math.pi + side * 0.08, 0)
+    sphere(name + "Head", h * 0.048, (x, y, h * 0.89), gold, scale=(0.9, 0.9, 1.15), subdiv=3)
+    lathe(name + "Ushnisha", [(h * 0.03, 0), (h * 0.02, h * 0.03), (0, h * 0.09)], (x, y, h * 0.93), gold, segments=10)
+    sphere(name + "Halo", h * 0.12, (x, y + 2, h * 0.9), halo)
+
+
+def thai_lamp_post(name, x, y, z, post, lamp):
+    """A lakeside lamp post with a lotus-bud lantern on top."""
+    lathe(name, [(0.14, 0), (0.1, 3.6)], (x, y, z), post, segments=6)
+    lathe(name + "Lotus", [(0.0, 0), (0.35, 0.25), (0.4, 0.6), (0.0, 1.1)], (x, y, z + 3.6), lamp, segments=8, smooth=True)
+
+
+def fountain(name, x, y, colours):
+    """The lake's musical fountain caught mid-show: jets of coloured light and spray."""
+    rnd = random.Random(9)
+    for i, c in enumerate(colours):
+        m = mat(f"{name}Jet{i}", (1, 1, 1), emit=c, strength=1.4)
+        for k in range(7):
+            dx = (i - len(colours) / 2) * 3 + k * 0.45
+            h = rnd.uniform(4, 9) * (1.7 if k == 3 else 1.0)
+            ob = lathe(f"{name}{i}_{k}", [(0.18, 0), (0.14, h * 0.75), (0.0, h)], (x + dx, y, 0.2), m, segments=6, smooth=True)
+            ob.rotation_euler = (0, (k - 3) * 0.09, 0)
+            # spray falling back round the top of each jet
+            sphere(f"{name}Spray{i}_{k}", 0.55, (x + dx + math.sin((k - 3) * 0.09) * h, y, h), m, scale=(1.4, 1, 0.6), subdiv=1)
 
 
 def standing_buddha(name, x, y, h, material):
@@ -1054,40 +1160,70 @@ def lanna_house(name, x, y, w, material_wall, material_roof, lit):
 # --------------------------------------------------------------------------- venues
 
 
+def tier_lights(name, x, y, z0, prof, every, light, scale=1.04):
+    """Floodlight catching the lip of every few tiers of a prang: thin glowing rings."""
+    lips = [p for i, p in enumerate(prof) if i % 4 == 2][::every]
+    for k, (rad, zz) in enumerate(lips):
+        if rad < 0.6:
+            continue
+        lathe(f"{name}Lip{k}", [(rad * scale, 0), (rad * scale, 0.35)], (x, y, z0 + zz), light, segments=20)
+
+
 def wat_arun():
     """Wat Arun seen across the Chao Phraya from the Tha Tien side, as in most night photos:
-    the floodlit central prang on its three steep terraces, four satellite prangs at the
-    corners and four mondops on the cardinal sides, riverside pavilions and a dinner cruise."""
+    the floodlit central prang on its three steep terraces, its tiers picked out by the
+    light, four satellite prangs at the corners and two mondops, the ordination hall with
+    its Thai roof among the trees, riverside salas at the pier, Thonburi glowing behind,
+    and krathongs drifting on the river."""
     lens(50)
-    world(top=(0.002, 0.003, 0.012), horizon=(0.02, 0.02, 0.05), glow=(1.0, 0.5, 0.25), glow_amt=0.12)
+    world(top=(0.002, 0.003, 0.012), horizon=(0.03, 0.025, 0.06), glow=(1.0, 0.5, 0.25), glow_amt=0.2)
     moon(0.146, 0.367)
     y = D
     ground_strip(y + 20)
     stone = lit_stone("Prang", warm=(1.0, 0.6, 0.22), strength=3.0, pattern="mosaic")
     rail = mat("Rail", (1, 1, 1), emit=(1.0, 0.82, 0.55), strength=6)
+    lip = mat("PrangLip", (1, 1, 1), emit=(1.0, 0.86, 0.6), strength=5)
     cy = y + 70
     # three terraces, the lowest square ~62 m
     terrace("Terrace0", 0, cy, 56, 8, stone, rail)
     terrace("Terrace1", 0, cy, 38, 15, stone, rail)
     terrace("Terrace2", 0, cy, 26, 21, stone, rail)
     steep_stair("Stair", 0, cy - 22, 8, 21, 6, 3.2, stone)
-    wat_arun_prang("PrangMain", 0, cy, 64, stone, z0=21, slim=0.78)
+    prof = wat_arun_prang("PrangMain", 0, cy, 64, stone, z0=21, slim=0.78)
+    tier_lights("PrangMain", 0, cy, 21, prof, 2, lip)
+    # the trident finial
+    gold = mat("Finial", (1, 1, 1), emit=(1.0, 0.8, 0.45), strength=12)
+    for dx in (-0.9, 0, 0.9):
+        lathe(f"Trident{dx}", [(0.18, 0), (0.12, 3.2 if dx == 0 else 2.4), (0, 3.8 if dx == 0 else 2.9)],
+              (dx, cy, 21 + 64 - 1), gold, segments=6)
     for i, (dx, dy) in enumerate(((-24, -24), (24, -24), (-24, 24), (24, 24))):
         terrace(f"SubTerrace{i}", dx, cy + dy, 9, 8, stone)
-        wat_arun_prang(f"PrangSub{i}", dx, cy + dy, 28, stone, z0=8, slim=0.85)
+        sp = wat_arun_prang(f"PrangSub{i}", dx, cy + dy, 30, stone, z0=8, slim=0.85)
+        tier_lights(f"PrangSub{i}", dx, cy + dy, 8, sp, 3, lip)
     for i, dx in enumerate((-31, 31)):
         terrace(f"MondopBase{i}", dx, cy, 6, 9, stone)
         prang(f"Mondop{i}", dx, cy, 12, 2.2, stone, tiers=5, segments=8)
         ob = bpy.data.objects[f"Mondop{i}"]
         ob.location.z = 9
-    roof = mat("Roof", (0.06, 0.035, 0.02), emit=(1.0, 0.5, 0.2), strength=0.35)
-    wall = lit_stone("RiverHall", warm=(1.0, 0.65, 0.35), strength=1.2)
+    # Thai-roofed buildings: the ubosot behind the trees on the left, salas at the river
+    tile = mat("ThaiTile", (0.25, 0.08, 0.03), rough=0.5, emit=(1.0, 0.42, 0.15), strength=0.45)
+    tile_green = mat("ThaiTileGreen", (0.04, 0.18, 0.08), rough=0.5, emit=(0.4, 0.9, 0.5), strength=0.18)
+    trim = mat("ThaiGold", (1, 1, 1), emit=(1.0, 0.78, 0.4), strength=8)
+    wall = lit_stone("RiverHall", warm=(1.0, 0.75, 0.5), strength=1.6)
+    thai_hall("Ubosot", -92, y + 60, 26, 40, 9, 3, wall, tile, trim)
     for i, dx in enumerate((-58, 56)):
-        box(f"Hall{i}", 16, 10, 4.5, (dx, y + 22, 0), wall)
-        prism_roof(f"HallRoof{i}", 18, 12, 6, (dx, y + 22, 4.5), roof)
+        thai_hall(f"Sala{i}", dx, y + 22, 16, 10, 4.5, 2, wall, tile_green if i else tile, trim)
     trees = mat("Trees", (0.01, 0.015, 0.012), rough=0.9)
     tree_cluster(1, -200, -75, y + 40, 16, trees, h=(10, 18))
     tree_cluster(2, 75, 200, y + 40, 16, trees, h=(10, 18))
+    # Thonburi behind: low lit buildings and a glow above them
+    rnd = random.Random(76)
+    for i in range(26):
+        bx = rnd.uniform(-420, 420)
+        if abs(bx) < 70:
+            continue
+        box(f"Thonburi{i}", rnd.uniform(14, 30), 18, rnd.uniform(6, 16), (bx, y + 420 + rnd.uniform(0, 300), 0),
+            windows_mat(f"ThonWin{i % 3}", density=0.3, scale=0.5))
     lamp_row(3, -200, -70, y + 2, 2.5, 12, (1.0, 0.82, 0.55), strength=40, size=0.45)
     lamp_row(31, 70, 200, y + 2, 2.5, 12, (1.0, 0.82, 0.55), strength=40, size=0.45)
     point("PrangGlow", (0, y + 20, 12), 70000, (1.0, 0.72, 0.42), radius=20)
@@ -1104,36 +1240,90 @@ def wat_arun():
         cruise_boat("Cruise", 0, 175, 36, heading=0.0)
 
 
+def chinese_pavilion(name, x, y, w, red, roof, gold, lamp):
+    """Lumphini's Chinese pavilion on its island: red columns, a double hip roof whose
+    corners sweep up, gold ridge, lanterns hung under the eaves."""
+    for i, (dx, dy) in enumerate(((-1, -1), (1, -1), (-1, 1), (1, 1), (0, -1), (0, 1))):
+        box(f"{name}Col{i}", 0.45, 0.45, 4.2, (x + dx * w * 0.42, y + dy * w * 0.32, 0.8), red)
+    z = 5.0
+    for k, (ww, hh) in enumerate(((w * 1.25, 1.8), (w * 0.8, 1.6))):
+        # a hip roof: a squashed pyramid, then its four corners pulled up
+        bm = bmesh.new()
+        hw, hd = ww / 2, ww * 0.38
+        base = [bm.verts.new(p) for p in ((-hw, -hd, 0), (hw, -hd, 0), (hw, hd, 0), (-hw, hd, 0))]
+        for v in base:
+            v.co.z += 0.7  # upturned corners
+        ridge = [bm.verts.new((-hw * 0.35, 0, hh)), bm.verts.new((hw * 0.35, 0, hh))]
+        bm.faces.new((base[0], base[1], ridge[1], ridge[0]))
+        bm.faces.new((base[1], base[2], ridge[1]))
+        bm.faces.new((base[2], base[3], ridge[0], ridge[1]))
+        bm.faces.new((base[3], base[0], ridge[0]))
+        bm.faces.new(list(reversed(base)))
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+        mesh_ob(f"{name}Roof{k}", bm, roof, loc=(x, y, z))
+        box(f"{name}Ridge{k}", ww * 0.72, 0.25, 0.3, (x, y, z + hh - 0.1), gold)
+        for i in range(5):
+            sphere(f"{name}Lamp{k}_{i}", 0.3, (x - hw * 0.8 + i * hw * 0.4, y - hd - 0.2, z - 0.4), lamp,
+                   scale=(1, 1, 1.3), subdiv=1)
+        z += hh + 1.0
+        if k == 0:
+            box(f"{name}Drum", w * 0.55, w * 0.4, 1.0, (x, y, z - 1.0), red)
+
+
 def lumphini():
-    """Lumphini Park lake looking south-west toward Silom and Sathorn: trees on the far
-    shore, the MahaNakhon tower with its pixel spiral, State Tower's gold dome, and
-    swan pedal boats tied up near the near shore."""
+    """Lumphini Park lake looking south-west toward Silom and Sathorn: rain trees on the
+    far shore, the red Chinese pavilion on its island with a red footbridge, lamp posts
+    along the lakeside path, swan pedal boats at the pier, and behind it all the towers:
+    MahaNakhon with its pixel spiral, State Tower's gold dome, and a skyline of setbacks,
+    lit crowns and LED bands with red beacons on the tallest."""
     lens(40)
-    world(top=(0.005, 0.006, 0.02), horizon=(0.05, 0.035, 0.07), glow=(1.0, 0.45, 0.3), glow_amt=0.35)
+    world(top=(0.005, 0.006, 0.02), horizon=(0.06, 0.04, 0.08), glow=(1.0, 0.45, 0.3), glow_amt=0.4)
     moon(-0.083, 0.378)
     y = 190
     ground_strip(y + 10)
     rnd = random.Random(7)
-    x = -620
-    i = 0
-    while x < 620:
-        w = rnd.uniform(20, 40)
-        h = rnd.uniform(50, 130) if abs(x) < 220 else rnd.uniform(30, 80)
-        depth = rnd.uniform(18, 30)
-        if not (-265 < x < -195):
-            box(f"Tower{i}", w, depth, h, (x + w / 2, y + 520 + rnd.uniform(0, 300), 0),
-                windows_mat(f"Win{i}", density=rnd.uniform(0.35, 0.6)))
-        x += w + rnd.uniform(4, 14)
-        i += 1
+    beacon = mat("Beacon", (1, 0, 0), emit=(1, 0.1, 0.1), strength=60)
+    crown = mat("Crown", (1, 1, 1), emit=(1.0, 0.85, 0.6), strength=5)
+    for row, (depth, hmul, n0) in enumerate(((1500, 1.3, 0), (520, 1.0, 100))):
+        x = -760
+        i = n0
+        while x < 760:
+            w = rnd.uniform(20, 42)
+            h = (rnd.uniform(60, 160) if abs(x) < 260 else rnd.uniform(30, 90)) * hmul
+            d = rnd.uniform(18, 30)
+            if not (-268 < x < -192):
+                city_tower(f"Tower{i}", x + w / 2, y + depth + rnd.uniform(0, 300), w, d, h, rnd,
+                           windows_mat(f"Win{i % 7}", density=rnd.uniform(0.3, 0.6),
+                                       lit=rnd.choice(((1.0, 0.78, 0.48), (0.85, 0.9, 1.0)))), beacon, crown)
+            x += w + rnd.uniform(4, 16)
+            i += 1
     pixel = windows_mat("MahaNakhon", lit=(0.85, 0.9, 1.0), density=0.6, scale=0.6)
     pixel_tower("MahaNakhon", -230, y + 900, 34, 300, pixel)
-    sphere("MahaNakhonBeacon", 1.2, (-230, y + 900, 302), mat("Beacon", (1, 0, 0), emit=(1, 0.1, 0.1), strength=60))
+    sphere("MahaNakhonBeacon", 1.2, (-230, y + 900, 302), beacon)
     gold = mat("Gold", (0.8, 0.55, 0.2), emit=(1.0, 0.75, 0.35), strength=4.0)
     dome_tower("StateTower", 170, y + 1300, 46, 220, windows_mat("StateWin", lit=(1.0, 0.85, 0.6), density=0.5), gold)
     trees = mat("Trees", (0.008, 0.014, 0.01), rough=0.9)
     tree_cluster(4, -300, 300, y + 25, 70, trees, h=(12, 24), spread=14)
-    lamp_row(5, -160, 160, y + 3, 3.5, 30, (1.0, 0.75, 0.4), strength=30, size=0.4)
+    # the lakeside path: lamp posts, each with its globe
+    post = mat("LampPost", (0.05, 0.05, 0.06), rough=0.5, metallic=0.6)
+    globe = mat("LampGlobe", (1, 1, 1), emit=(1.0, 0.82, 0.55), strength=26)
+    for i in range(26):
+        lx = -170 + i * 13.6
+        lathe(f"PathPost{i}", [(0.12, 0), (0.08, 4.0)], (lx, y + 3, 0.6), post, segments=6)
+        sphere(f"PathGlobe{i}", 0.42, (lx, y + 3, 4.9), globe, subdiv=2)
     point("Pavilion", (0, y + 8, 6), 7500, (1.0, 0.7, 0.4), radius=4)
+    # the Chinese pavilion on its island, a red bridge to it
+    red = mat("PavilionRed", (0.45, 0.04, 0.03), rough=0.5, emit=(1.0, 0.2, 0.1), strength=0.9)
+    roof = mat("PavilionRoof", (0.05, 0.18, 0.12), rough=0.5, emit=(0.3, 0.9, 0.6), strength=0.25)
+    trim = mat("PavilionGold", (1, 1, 1), emit=(1.0, 0.78, 0.4), strength=7)
+    lantern = mat("RedLantern", (1, 1, 1), emit=(1.0, 0.18, 0.08), strength=16)
+    sphere("PavilionIsland", 14, (62, 152, -4), mat("IslandGround", (0.01, 0.012, 0.015)), scale=(1.4, 0.8, 0.35))
+    chinese_pavilion("ChinesePavilion", 62, 150, 9, red, roof, trim, lantern)
+    for k in range(16):
+        t = k / 15
+        bx = 62 - 13 - t * 30
+        box(f"RedBridge{k}", 2.1, 3.0, 0.35, (bx, 146 - t * 8, 0.9 + math.sin(t * math.pi) * 2.4), red)
+    point("PavilionGlow", (62, 140, 5), 3500, (1.0, 0.5, 0.3), radius=3)
     # swan boats rafted together at a pier on the left, close enough to read
     bamboo_pier("SwanPier", -38, 74, 8, width=4)
     for i, (sx, sy, hd) in enumerate(((-44, 64, 0.3), (-39, 62, 0.1), (-34, 65, -0.2), (-29, 63, 0.2), (36, 92, 2.9))):
@@ -1185,7 +1375,7 @@ def sukhothai():
     night: the lotus-bud chedi on its square base ringed by four Khmer corner towers, the
     two brick mondops of the standing Buddhas either side, smaller lotus-bud chedis, the
     vihara's laterite columns with a seated Buddha among them, candles along the moat,
-    krathongs on the water and fireworks over the ruins."""
+    and krathongs on the water."""
     lens(45)
     world(top=(0.003, 0.004, 0.016), horizon=(0.035, 0.03, 0.07), glow=(1.0, 0.5, 0.2), glow_amt=0.18)
     moon(0.111, 0.333, size_deg=3.6)
@@ -1229,10 +1419,7 @@ def sukhothai():
     lamp_row(9, -74, 74, y + 12.5, 1.9, 60, (1.0, 0.7, 0.32), strength=30, size=0.2)
     point("ChediGlow", (0, y + 12, 10), 40000, (1.0, 0.65, 0.35), radius=15)
     distant_krathongs(10, 60, 110, y - 4)
-    # the fireworks of the festival, high on the right, clear of the moon and the chedi
-    firework("FwGold", (150, y + 420, 125), 34, (1.0, 0.5, 0.06), seed=1)
-    firework("FwPink", (205, y + 520, 95), 26, (1.0, 0.1, 0.38), rays=34, seed=2)
-    firework("FwGreen", (-185, y + 480, 105), 24, (0.15, 1.0, 0.3), rays=30, seed=3)
+    # no fireworks here: the web scene animates them over the backdrop (RiverScene FX)
 
 
 def ridge(name, y, x0, x1, profile, material, n=160):
@@ -1366,10 +1553,11 @@ def chiang_mai():
 
 def roi_et():
     """Bueng Phalanchai, Roi Et: the 101 m Roi Et Tower (Ho Wot) with its crown shaped like
-    a wot pan-pipe, the island pavilion reached by a footbridge, lamps along the lake, and
-    Luang Pho Yai, the tall standing Buddha of Wat Burapha, gold over the city to the right."""
+    a wot pan-pipe, the island with its Thai pavilion reached by a footbridge, lotus-bud
+    lamp posts along the lake, the musical fountain mid-show, and Luang Pho Yai, the tall
+    gilded standing Buddha of Wat Burapha, over the city to the right."""
     lens(42)
-    world(top=(0.003, 0.005, 0.02), horizon=(0.035, 0.035, 0.08), glow=(1.0, 0.6, 0.3), glow_amt=0.18)
+    world(top=(0.003, 0.005, 0.02), horizon=(0.04, 0.04, 0.09), glow=(1.0, 0.6, 0.3), glow_amt=0.22)
     moon(-0.090, 0.356)
     y = D
     ground_strip(y + 10)
@@ -1383,39 +1571,53 @@ def roi_et():
         a = 2 * math.pi * i / 12
         ob = box(f"Fin{i}", 0.7, 1.6, 70, (tx + math.cos(a) * 5.0, ty + math.sin(a) * 5.0, 8), gold)
         ob.rotation_euler = (0, 0, a)
+    ring = mat("HoWotRing", (1, 1, 1), emit=(1.0, 0.85, 0.55), strength=9)
+    for k in range(6):  # light rings round the shaft at each floor band
+        lathe(f"HoWotBand{k}", [(5.4 - k * 0.12, 0), (5.4 - k * 0.12, 0.5)], (tx, ty, 14 + k * 11), ring, segments=24)
     top = 80
     lathe("HoWotDeck", [(5, 0), (9, 3), (9, 7), (6, 9)], (tx, ty, top), glass, segments=24)
     lathe("HoWotDeckRim", [(9.4, 0), (9.4, 0.9)], (tx, ty, top + 3), gold, segments=24)
     # the wot: a ring of pipes, longest in the middle, fanning out like a crown
-    for ring, (n, rr, ln, tilt) in enumerate(((18, 6.5, 14, 0.32), (12, 3.6, 20, 0.18), (6, 1.4, 26, 0.06))):
+    for ring_i, (n, rr, ln, tilt) in enumerate(((18, 6.5, 14, 0.32), (12, 3.6, 20, 0.18), (6, 1.4, 26, 0.06))):
         for i in range(n):
-            a = 2 * math.pi * (i + ring * 0.5) / n
+            a = 2 * math.pi * (i + ring_i * 0.5) / n
             L = ln + 2 * math.sin(i * 1.7)
-            ob = lathe(f"Pipe{ring}_{i}", [(0.75, 0), (0.65, L), (0, L + 1.0)],
+            ob = lathe(f"Pipe{ring_i}_{i}", [(0.75, 0), (0.65, L), (0, L + 1.0)],
                        (tx + math.cos(a) * rr, ty + math.sin(a) * rr, top + 8), gold, segments=8)
             ob.rotation_euler = (-math.sin(a) * tilt, math.cos(a) * tilt, 0)
     point("TowerTop", (tx, ty - 14, top + 14), 4000, (1.0, 0.85, 0.6), radius=3)
-    # island pavilion in the lake with a footbridge
+    # island in the lake with a Thai pavilion and a footbridge
     trees = mat("Trees", (0.008, 0.013, 0.012), rough=0.9)
     sphere("Island", 26, (-95, y - 20, -5), mat("IslandGround", (0.01, 0.012, 0.015)), scale=(1.6, 0.7, 0.3))
-    tree_cluster(14, -125, -65, y - 18, 10, trees, h=(7, 12), spread=4)
-    roof = mat("SalaRoof", (0.4, 0.12, 0.05), emit=(1.0, 0.45, 0.2), strength=0.7)
-    box("Sala", 10, 8, 4, (-95, y - 28, 2.5), lit_stone("SalaLit", strength=1.8))
-    prism_roof("SalaRoof", 12, 10, 4, (-95, y - 28, 6.5), roof)
-    prism_roof("SalaRoof2", 8, 7, 3.5, (-95, y - 28, 9.5), roof)
+    tree_cluster(14, -125, -65, y - 12, 10, trees, h=(7, 12), spread=4)
+    tile = mat("SalaRoof", (0.4, 0.12, 0.05), emit=(1.0, 0.45, 0.2), strength=0.7)
+    trim = mat("SalaGold", (1, 1, 1), emit=(1.0, 0.78, 0.4), strength=8)
+    thai_hall("Sala", -95, y - 28, 12, 9, 4.5, 2, lit_stone("SalaLit", strength=1.8), tile, trim)
     deck = mat("FootBridge", (0.2, 0.18, 0.15), emit=(1.0, 0.75, 0.45), strength=0.5)
     box("FootBridge", 70, 2.5, 0.5, (-30, y - 26, 1.6), deck)
     lamp_row(18, -65, 5, y - 27.5, 2.6, 15, (1.0, 0.8, 0.5), strength=40, size=0.22)
-    standing_buddha("LuangPhoYai", 330, y + 700, 68, mat("BuddhaGold", (0.8, 0.55, 0.2), emit=(1.0, 0.7, 0.3), strength=5.0))
+    buddha_gold = mat("BuddhaGold2", (0.8, 0.5, 0.12), emit=(1.0, 0.6, 0.18), strength=2.4, metallic=0.6)
+    halo = mat("BuddhaHalo", (1, 1, 1), emit=(1.0, 0.6, 0.25), strength=0.25)
+    gold_standing_buddha("LuangPhoYai", 330, y + 700, 68, buddha_gold, halo)
     tree_cluster(15, -320, -150, y + 30, 26, trees, h=(8, 16))
     tree_cluster(16, 70, 320, y + 30, 26, trees, h=(8, 16))
     rnd = random.Random(5)
-    for i in range(16):
-        box(f"City{i}", rnd.uniform(15, 30), 20, rnd.uniform(10, 26), (rnd.uniform(-400, 400), y + 300 + rnd.uniform(0, 400), 0),
-            windows_mat(f"RoiWin{i % 3}", density=0.35))
-    lamp_row(17, -260, 260, y + 1.5, 1.0, 110, (1.0, 0.72, 0.35), strength=45, size=0.28)
+    beacon = mat("Beacon", (1, 0, 0), emit=(1, 0.1, 0.1), strength=60)
+    crown = mat("Crown", (1, 1, 1), emit=(1.0, 0.85, 0.6), strength=4)
+    for i in range(22):
+        bx = rnd.uniform(-420, 420)
+        if -40 < bx < 60:
+            continue
+        city_tower(f"City{i}", bx, y + 300 + rnd.uniform(0, 400), rnd.uniform(15, 30), 20, rnd.uniform(10, 30), rnd,
+                   windows_mat(f"RoiWin{i % 3}", density=0.35), beacon, crown)
+    # lotus-bud lamp posts along the shore instead of bare bulbs
+    post = mat("LotusPost", (0.08, 0.07, 0.06), rough=0.5, metallic=0.5)
+    lotus = mat("LotusLamp", (1, 1, 1), emit=(1.0, 0.75, 0.4), strength=18)
+    for i in range(36):
+        thai_lamp_post(f"ShorePost{i}", -260 + i * 520 / 35, y + 1.5, 0.6, post, lotus)
     point("ShoreGlow", (0, y + 5, 4), 12500, (1.0, 0.65, 0.35), radius=10)
     crowd(51, -200, 200, y + 3, 70, spread=2)
+    fountain("Fountain", -42, y - 95, [(0.2, 0.7, 1.0), (1.0, 0.3, 0.7), (0.4, 1.0, 0.6), (1.0, 0.75, 0.3)])
     distant_krathongs(72, 60, 120, y - 6)
 
 
