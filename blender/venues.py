@@ -1691,6 +1691,56 @@ def surnapha_tower(name, x, y):
     point(name + "HeadGlow", (x, y - 14, hz + 6), 9000, (1.0, 0.72, 0.38), radius=3)
 
 
+def festoon(name, pts, bulb, per=12, sag=0.9, size=0.16):
+    """Festoon lights: bare warm bulbs on a wire slung between poles, sagging in each span."""
+    k = 0
+    for a, b in zip(pts, pts[1:]):
+        for j in range(per):
+            t = (j + 0.5) / per
+            x = a[0] + (b[0] - a[0]) * t
+            y = a[1] + (b[1] - a[1]) * t
+            z = a[2] + (b[2] - a[2]) * t - math.sin(t * math.pi) * sag
+            sphere(f"{name}_{k}", size, (x, y, z), bulb, subdiv=1)
+            k += 1
+
+
+def beam_mat(name, colour, strength=1.2, alpha=0.12):
+    """A stage light beam: faint glowing air, mostly see-through."""
+    m = bpy.data.materials.new(name)
+    nt = m.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    em = nt.nodes.new("ShaderNodeEmission")
+    em.inputs["Color"].default_value = (*colour, 1)
+    em.inputs["Strength"].default_value = strength
+    tr = nt.nodes.new("ShaderNodeBsdfTransparent")
+    mix = nt.nodes.new("ShaderNodeMixShader")
+    mix.inputs[0].default_value = alpha
+    nt.links.new(tr.outputs[0], mix.inputs[1])
+    nt.links.new(em.outputs[0], mix.inputs[2])
+    nt.links.new(mix.outputs[0], out.inputs["Surface"])
+    return m
+
+
+def led_screen_mat(name):
+    """The stage screen showing a festival graphic: a soft gold-to-violet wash with a
+    brighter lotus-shaped bloom in the middle."""
+    m = bpy.data.materials.new(name)
+    nt = m.node_tree
+    b = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
+    b.inputs["Base Color"].default_value = (0, 0, 0, 1)
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+    nt.links.new(tc.outputs["Generated"], sep.inputs[0])
+    ramp = nt.nodes.new("ShaderNodeValToRGB")
+    ramp.color_ramp.elements[0].color = (0.25, 0.04, 0.6, 1)
+    ramp.color_ramp.elements[1].color = (0.9, 0.35, 0.05, 1)
+    nt.links.new(sep.outputs["X"], ramp.inputs["Fac"])
+    nt.links.new(ramp.outputs["Color"], b.inputs["Emission Color"])
+    b.inputs["Emission Strength"].default_value = 0.9
+    return m
+
+
 def sut():
     """SUT fountain plaza on Loy Krathong night, after event photos on sut.ac.th and the
     university's Facebook pages: an oval fountain pool with a raised stone curb lit by an
@@ -1760,8 +1810,45 @@ def sut():
         point(f"StageLight{k}", (sx + 6 + k * 9, sy - 2, 10), 2500, c, radius=1.0)
 
     point("PlazaFill", (0, 40, 16), 18000, (1.0, 0.8, 0.55), radius=10)
+
+    # festival lights: poles round the back of the plaza with festoons slung between them,
+    # and a few long runs criss-crossing high over the far half of the pool
+    bulb = mat("FestoonBulb", (1, 1, 1), emit=(1.0, 0.78, 0.42), strength=30)
+    pole = mat("FestoonPole", (0.12, 0.12, 0.13), rough=0.5, metallic=0.5)
+    ring = []
+    for k in range(13):
+        a = math.radians(8 + k * 164 / 12)
+        px, py = cx + (rx + 21) * math.cos(a), cy + (ry + 21) * math.sin(a)
+        lathe(f"FestoonPole{k}", [(0.12, 0), (0.09, 8.5)], (px, py, 0.6), pole, segments=6)
+        ring.append((px, py, 8.9))
+    festoon("FestoonRing", ring, bulb, per=14, sag=1.4)
+    for i, (a0, a1) in enumerate(((20, 120), (60, 160), (40, 140))):
+        p0 = ring[round((a0 - 8) / 164 * 12)]
+        p1 = ring[round((a1 - 8) / 164 * 12)]
+        festoon(f"FestoonCross{i}", [p0, p1], bulb, per=46, sag=3.2, size=0.14)
+    # paper lanterns under the eaves of every tent
+    paper = [mat(f"TentLantern{k}", (1, 1, 1), emit=c, strength=12)
+             for k, c in enumerate(((1.0, 0.25, 0.2), (1.0, 0.7, 0.25), (1.0, 0.4, 0.6)))]
+    for k in range(18):
+        a = math.radians(15 + k * 150 / 17)
+        x = cx + (rx + 12) * math.cos(a)
+        yy = cy + (ry + 12) * math.sin(a)
+        for j, dx in enumerate((-2.2, 0.0, 2.2)):
+            sphere(f"TentLantern{k}_{j}", 0.32, (x + dx, yy - 3.2, 2.9), paper[(k + j) % 3], scale=(1, 1, 1.3), subdiv=1)
+    # the stage: an LED screen in the truss and beams from the top
+    box("StageScreen", 18, 0.4, 6, (sx + 15, sy + 0.6, 2.6), led_screen_mat("StageScreen"))
+    for k, (c, lean) in enumerate((((1.0, 0.4, 0.8), -0.35), ((0.5, 0.6, 1.0), -0.12), ((1.0, 0.8, 0.5), 0.12),
+                                    ((0.6, 0.4, 1.0), 0.35))):
+        ob = lathe(f"StageBeam{k}", [(0.2, 0), (2.6, 26)], (sx + 5 + k * 7, sy - 0.5, 11.2), beam_mat(f"Beam{k}", c), segments=12)
+        ob.rotation_euler = (0.25, lean + math.pi, 0)
+    # Ho Suranapha dressed for the night: a ring of lights round the viewing deck
+    tower_ring = mat("TowerRing", (1, 1, 1), emit=(1.0, 0.82, 0.5), strength=25)
+    for k in range(32):
+        a = 2 * math.pi * k / 32
+        sphere(f"TowerRingBulb{k}", 0.22, (26 + math.cos(a) * 6.5, 280 + math.sin(a) * 6.5, 2.4 + 56 + 7.2), tower_ring, subdiv=1)
     # people crouching or standing at the curb to float krathongs
     rnd = random.Random(61)
+    flame = mat("HandFlame", (1, 1, 1), emit=(1.0, 0.6, 0.22), strength=30)
     for i in range(120):
         a = rnd.uniform(math.radians(-20), math.radians(200))
         rr = 1.0 + rnd.uniform(0.6, 2.2)
@@ -1769,7 +1856,11 @@ def sut():
         yy = cy + (ry + rr) * math.sin(a)
         if yy < 18:
             continue
-        person(f"P61_{i}", x, yy, h=rnd.uniform(1.45, 1.8), crouch=rnd.random() < 0.55)
+        crouch = rnd.random() < 0.55
+        person(f"P61_{i}", x, yy, h=rnd.uniform(1.45, 1.8), crouch=crouch)
+        if crouch:  # the krathong in their hands, its candle lit, about to go on the water
+            inward = Vector((cx - x, cy - yy, 0)).normalized() * 0.5
+            sphere(f"P61Krathong{i}", 0.08, (x + inward.x, yy + inward.y, 1.2), flame, scale=(1, 1, 1.6), subdiv=1)
 
 
 VENUES = {"wat_arun": wat_arun, "lumphini": lumphini, "sukhothai": sukhothai,
