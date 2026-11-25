@@ -1,19 +1,19 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { DEFAULT_DESIGN, MAX_FLOWERS, normalizeDesign } from '@/features/krathong/options';
+import { BLANK_DESIGN, MAX_FLOWERS, normalizeDesign } from '@/features/krathong/options';
 import type { KrathongDesign, KrathongFlower, WishVisibility } from '@/types/domain';
 
 type DraftState = {
   design: KrathongDesign;
   wish: string;
   visibility: WishVisibility;
-  /** Money put in the krathong for show: null none, 0 coins without an amount. Never paid or stored. */
-  coinAmount: number | null;
   setPart: <K extends keyof KrathongDesign>(key: K, value: KrathongDesign[K]) => void;
   toggleFlower: (kind: KrathongFlower) => void;
   /** Replace the whole design at once, e.g. a random one. */
   setDesign: (design: KrathongDesign) => void;
-  setField: (patch: Partial<Pick<DraftState, 'wish' | 'visibility' | 'coinAmount'>>) => void;
+  /** Sets or removes the money; none drops the key rather than storing undefined. */
+  setMoney: (money: number | undefined) => void;
+  setField: (patch: Partial<Pick<DraftState, 'wish' | 'visibility'>>) => void;
   resetDesign: () => void;
   clear: () => void;
 };
@@ -22,10 +22,9 @@ type DraftState = {
 export const useDraftStore = create<DraftState>()(
   persist(
     (set) => ({
-      design: DEFAULT_DESIGN,
+      design: BLANK_DESIGN,
       wish: '',
       visibility: 'private',
-      coinAmount: null,
       setPart: (key, value) => set((s) => ({ design: { ...s.design, [key]: value } })),
       toggleFlower: (kind) =>
         set((s) => {
@@ -35,9 +34,22 @@ export const useDraftStore = create<DraftState>()(
           return { design: { ...s.design, flowers } };
         }),
       setDesign: (design) => set({ design }),
+      setMoney: (money) =>
+        set((s) => {
+          const { money: _old, ...rest } = s.design;
+          void _old;
+          return { design: money ? { ...rest, money } : rest };
+        }),
       setField: (patch) => set(patch),
-      resetDesign: () => set((s) => ({ design: { ...DEFAULT_DESIGN, coins: s.coinAmount !== null } })),
-      clear: () => set({ wish: '', visibility: 'private', coinAmount: null }),
+      resetDesign: () => set({ design: BLANK_DESIGN }),
+      // After floating: the wish and the money go with that krathong; the decorations stay
+      // so "ลอยอีกใบ" starts from the last look.
+      clear: () =>
+        set((s) => {
+          const { money: _old, ...rest } = s.design;
+          void _old;
+          return { wish: '', visibility: 'private', design: { ...rest, coins: false } };
+        }),
     }),
     {
       name: 'loynamkan:draft',
@@ -46,10 +58,9 @@ export const useDraftStore = create<DraftState>()(
         return {
           ...current,
           ...p,
-          // coins are not restored, so they never survive a reload on their own
-          design: { ...normalizeDesign(p.design), coins: false },
+          // A first visit starts bare; a draft in progress comes back as it was left.
+          design: p.design ? normalizeDesign(p.design) : BLANK_DESIGN,
           visibility: p.visibility === 'public' ? 'public' : 'private',
-          coinAmount: null,
         };
       },
     },

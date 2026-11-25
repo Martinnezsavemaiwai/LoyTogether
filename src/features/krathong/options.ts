@@ -6,6 +6,7 @@ import type {
   KrathongFlower,
   KrathongShape,
 } from '@/types/domain';
+import { isValidMoney } from './money';
 
 export interface Option<T extends string> {
   value: T;
@@ -52,6 +53,23 @@ export const BEADS: Option<KrathongBeads>[] = [
 
 export const MAX_FLOWERS = 3;
 
+/**
+ * What the builder starts from: a bare base the visitor decorates themselves.
+ * Separate from DEFAULT_DESIGN, which fills gaps in stored krathongs and must not change
+ * how krathongs that already floated look.
+ */
+export const BLANK_DESIGN: KrathongDesign = {
+  shape: 'lotus',
+  base: 'banana_leaf',
+  flowers: [],
+  candle: null,
+  incense: false,
+  beads: null,
+  garland: false,
+  coins: false,
+};
+
+/** Fallback for missing or invalid fields in stored designs (see normalizeDesign). */
 export const DEFAULT_DESIGN: KrathongDesign = {
   shape: 'lotus',
   base: 'banana_leaf',
@@ -92,13 +110,16 @@ const FLOWER_V = values(FLOWERS);
 const CANDLE_V = values(CANDLES);
 const BEAD_V = values(BEADS);
 const KEYS = ['shape', 'base', 'flowers', 'candle', 'incense', 'beads', 'garland', 'coins'];
+const OPTIONAL_KEYS = ['money'];
 
 const isOneOf = <T,>(list: readonly T[], v: unknown): v is T => list.includes(v as T);
 
 export function isValidDesign(value: unknown): value is KrathongDesign {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const d = value as Record<string, unknown>;
-  if (Object.keys(d).length !== KEYS.length || !KEYS.every((k) => k in d)) return false;
+  const extra = Object.keys(d).filter((k) => !KEYS.includes(k));
+  if (!KEYS.every((k) => k in d) || !extra.every((k) => OPTIONAL_KEYS.includes(k))) return false;
+  if ('money' in d && !isValidMoney(d.money)) return false;
   const flowers = d.flowers;
   return (
     isOneOf(SHAPE_V, d.shape) &&
@@ -143,6 +164,7 @@ export function normalizeDesign(value: unknown): KrathongDesign {
   if (typeof d.garland === 'boolean') out.garland = d.garland;
   else if (d.decoration === 'jasmine_garland') out.garland = true;
   if (typeof d.coins === 'boolean') out.coins = d.coins;
+  if (isValidMoney(d.money)) out.money = d.money;
   return out;
 }
 

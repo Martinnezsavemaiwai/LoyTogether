@@ -22,6 +22,11 @@ export interface KrathongDesign {
   beads: KrathongBeads | null;
   garland: boolean;
   coins: boolean;
+  /**
+   * Whole baht tucked in for show (1 to 99,999), drawn as real notes and coins.
+   * Left out (not null) when there is none, so designs without it keep the original 8 keys.
+   */
+  money?: number;
 }
 
 export type WishVisibility = 'public' | 'private';

@@ -1,6 +1,7 @@
 import { memo, useState } from 'react';
 import type { KrathongBase, KrathongDesign } from '@/types/domain';
 import { KrathongSvg } from './KrathongSvg';
+import { moneyLayers } from './money';
 import { flowerPhases } from './options';
 
 /**
@@ -33,8 +34,9 @@ export interface SpriteLayer {
 }
 
 export function spriteLayers(design: KrathongDesign): SpriteLayer[] {
-  const { shape, base, candle, incense, beads, garland, coins } = design;
+  const { shape, base, candle, incense, beads, garland, coins, money } = design;
   const phases = flowerPhases(design.flowers);
+  const cash = money ? moneyLayers(money) : { notes: [], coins: [] };
   const flowers = (side: 'back' | 'front') =>
     phases.map(({ kind, phase }) => ({
       key: `flower-${side}-${kind}-${phase}`,
@@ -46,11 +48,15 @@ export function spriteLayers(design: KrathongDesign): SpriteLayer[] {
     !!beads && { key: 'beads-back', src: `/krathong/beads-back-${shape}-${beads}.webp`, lift: true },
     garland && { key: 'garland-back', src: `/krathong/garland-back-${shape}.webp`, lift: true },
     ...flowers('back'),
+    // Notes on skewers stand behind the candle, so they go in before it.
+    ...cash.notes.map((n) => ({ ...n, lift: true })),
     !!candle && { key: 'candle', src: `/krathong/candle-${candle}.webp`, lift: true },
     incense && { key: 'incense', src: '/krathong/incense.webp', lift: true },
     coins && { key: 'coins', src: `/krathong/coins-${shape}.webp`, lift: true },
     ...flowers('front'),
     !!beads && { key: 'beads-front', src: `/krathong/beads-front-${shape}-${beads}.webp`, lift: true },
+    // Typed money: coins lie on the near side of the plate, under the near-side folds.
+    ...cash.coins.map((c) => ({ ...c, lift: true })),
     // the near-side folds overlap the front flowers, as on a real krathong
     RIM_BASES.has(base) && { key: 'rim-front', src: `/krathong/rim-front-${shape}-${base}.webp`, lift: false },
     garland && { key: 'garland-front', src: `/krathong/garland-front-${shape}.webp`, lift: true },
@@ -68,9 +74,14 @@ interface Props {
   /** Flame glow; off for small thumbnails. */
   lit?: boolean;
   title?: string;
+  /**
+   * Builder only: with no candle chosen, a faint dashed outline marks where one goes,
+   * so a bare krathong reads as waiting to be decorated rather than unfinished.
+   */
+  ghostCandle?: boolean;
 }
 
-function KrathongArtImpl({ design, className = '', lit = true, title }: Props) {
+function KrathongArtImpl({ design, className = '', lit = true, title, ghostCandle = false }: Props) {
   const [failed, setFailed] = useState(false);
   if (failed) return <KrathongSvg design={design} className={className} lit={lit} title={title} />;
   const lift = liftPercent(design.base);
@@ -87,6 +98,15 @@ function KrathongArtImpl({ design, className = '', lit = true, title }: Props) {
           className="lt-glow pointer-events-none absolute left-1/2 aspect-square w-[34%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgb(255_210_130/0.55),rgb(245_199_106/0.12)_45%,transparent_70%)]"
           style={{ top: `${21 - lift}%` }}
         />
+      )}
+      {ghostCandle && !design.candle && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute left-1/2 h-[30%] w-[8%] -translate-x-1/2 rounded-t-full border-[1.5px] border-dashed border-gold/90 bg-night/45"
+          style={{ top: `${27 - lift}%` }}
+        >
+          <span className="absolute -top-[18%] left-1/2 h-[16%] w-[1.5px] -translate-x-1/2 bg-gold/90" />
+        </span>
       )}
       {spriteLayers(design).map((layer) => (
         <img

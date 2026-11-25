@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
-import { ArrowLeft, Check, ChevronDown, Eye, Lock, RotateCcw, Shuffle } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, Eye, Lock, RotateCcw, Shuffle, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { RiverScene } from '@/features/festival/RiverScene';
 import { getRiver } from '@/features/rivers/rivers';
@@ -15,12 +15,13 @@ import { ChoicePicker, FlowerPicker, SwitchRow, ThumbPicker } from './PartPicker
 import { CoinPicker } from '@/features/tips/CoinPicker';
 
 const STEPS = [
-  { id: 'base', label: 'ฐาน', title: 'เลือกทรงกับฐาน' },
-  { id: 'decor', label: 'ตกแต่ง', title: 'แต่งกระทง' },
-  { id: 'wish', label: 'อธิษฐาน', title: 'อธิษฐานก่อนลอย' },
-  { id: 'float', label: 'ลอย', title: 'พร้อมปล่อยลงน้ำ' },
+  { id: 'base', label: 'ฐาน', title: 'เลือกทรงกับฐาน', hint: 'เริ่มจากฐานเปล่า แล้วค่อยแต่งในขั้นถัดไป' },
+  { id: 'decor', label: 'ตกแต่ง', title: 'แต่งกระทง', hint: 'แตะเพื่อใส่หรือเอาออก กระทงด้านบนเปลี่ยนตามทันที' },
+  { id: 'wish', label: 'อธิษฐาน', title: 'อธิษฐานก่อนลอย', hint: 'เขียนสั้นๆ จากใจก็พอ' },
+  { id: 'float', label: 'ลอย', title: 'พร้อมปล่อยลงน้ำ', hint: 'ตรวจอีกครั้ง แล้วปล่อยกระทงลงน้ำ' },
 ] as const;
 
+const DECOR_STEP = 1;
 const WISH_STEP = 2;
 const FLOAT_STEP = 3;
 /** Long enough to watch the krathong settle onto the water, short enough not to wait. */
@@ -65,6 +66,17 @@ export function CreatePage() {
   const builderRef = useRef<HTMLElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const movedStep = useRef(false);
+  // Steps the visitor has actually been on; a step is ticked only once it is really done.
+  const [visited, setVisited] = useState<Set<number>>(() => new Set([0]));
+  // Shown instead of moving on when the krathong still has nothing on it.
+  const [bareNudge, setBareNudge] = useState(false);
+  // "เริ่มใหม่" wipes every part, so the last look can be brought back for a moment.
+  const [undoDesign, setUndoDesign] = useState<typeof draft.design | null>(null);
+  useEffect(() => {
+    if (!undoDesign) return;
+    const t = window.setTimeout(() => setUndoDesign(null), 8000);
+    return () => window.clearTimeout(t);
+  }, [undoDesign]);
 
   // Each step starts at its top, and focus follows so screen readers hear the new step.
   useEffect(() => {
@@ -87,23 +99,44 @@ export function CreatePage() {
   const placeName = room ? room.title : river.name;
 
   const wishLength = charLength(draft.wish.trim());
-  const extrasOn = [draft.design.beads !== null, draft.design.incense, draft.design.garland, draft.coinAmount !== null].filter(
+  const extrasOn = [draft.design.beads !== null, draft.design.garland, draft.design.coins, !!draft.design.money].filter(
     Boolean,
   ).length;
+  // Nothing a visitor would call decoration yet: no candle, flowers, incense or extras.
+  const isBare =
+    !draft.design.candle && draft.design.flowers.length === 0 && !draft.design.incense && extrasOn === 0;
+  const isDone = (i: number) => i !== step && visited.has(i) && (i !== DECOR_STEP || !isBare);
 
   const goTo = (next: number) => {
     if (submitting || next === step) return;
+    setBareNudge(false);
     if (next >= FLOAT_STEP) {
       const wish = validateWish(draft.wish);
       setErrors({ wish: wish.ok ? undefined : wish.error });
       if (!wish.ok) {
         movedStep.current = true;
+        setVisited((v) => new Set(v).add(step).add(WISH_STEP));
         setStep(WISH_STEP);
         return;
       }
     }
     movedStep.current = true;
+    setVisited((v) => new Set(v).add(step).add(next));
     setStep(next);
+  };
+
+  // The forward button on the decor step asks once before a bare krathong moves on.
+  const forward = () => {
+    if (step === DECOR_STEP && isBare && !bareNudge) {
+      setBareNudge(true);
+      return;
+    }
+    goTo(step + 1);
+  };
+
+  const reset = () => {
+    setUndoDesign(draft.design);
+    draft.resetDesign();
   };
 
   const float = async () => {
@@ -145,7 +178,6 @@ export function CreatePage() {
         settle,
       ]);
       draft.clear();
-      draft.setPart('coins', false);
       attemptId.current = crypto.randomUUID();
       navigate(backHref, { state: { justFloated: krathong } });
     } catch (err) {
@@ -158,8 +190,12 @@ export function CreatePage() {
   const current = STEPS[step]!;
   const next = STEPS[step + 1];
   const wishText = draft.wish.trim();
-  // Writing and checking need room more than a big preview, so it steps back on a phone.
-  const compact = step >= WISH_STEP;
+  // Writing needs room more than a big preview, so it steps back on a phone while the
+  // wish is typed; on the float step the krathong is the moment, so it comes back full.
+  const compact = step === WISH_STEP;
+  // A bare krathong would draw every shape as the same flat plate, so the shape cards
+  // show a candle and a flower to make the outlines readable.
+  const showcase = isBare ? { ...draft.design, flowers: ['marigold' as const], candle: 'golden' as const } : draft.design;
   const wishLeft = WISH_MAX - wishLength;
 
   return (
@@ -167,7 +203,7 @@ export function CreatePage() {
       {/* Live preview on the chosen river */}
       <section
         aria-label="ตัวอย่างกระทง"
-        className={`sticky top-0 z-10 overflow-hidden border-b border-ink/10 transition-[height] duration-500 ease-[var(--ease-out-expo)] lg:h-[100svh] lg:border-b-0 ${
+        className={`sticky top-0 z-10 overflow-hidden border-b border-ink/10 transition-[height] duration-500 ease-[var(--ease-out-expo)] motion-reduce:transition-none lg:h-[100svh] lg:transition-none lg:border-b-0 ${
           compact ? 'h-[24svh] sm:h-[30svh]' : 'h-[38svh] sm:h-[42svh]'
         }`}
       >
@@ -183,7 +219,7 @@ export function CreatePage() {
         </div>
         <div className="absolute inset-x-0 bottom-[4%] flex justify-center">
           <div
-            className={`${releasing ? 'lt-launch' : 'lt-bob'} transition-[width] duration-500 lg:w-[min(30rem,40vw)] ${
+            className={`${releasing ? 'lt-launch' : 'lt-bob'} transition-[width] duration-500 motion-reduce:transition-none lg:w-[min(30rem,40vw)] ${
               compact ? 'w-[min(10rem,36vw)]' : 'w-[min(17rem,56vw)]'
             }`}
           >
@@ -191,6 +227,7 @@ export function CreatePage() {
               design={draft.design}
               className="h-auto w-full drop-shadow-[0_18px_30px_rgb(0_0_0/0.5)]"
               title="ตัวอย่างกระทงของคุณ"
+              ghostCandle
             />
           </div>
           {releasing && <span aria-hidden className="lt-ripple absolute bottom-[6%] h-6 w-40 rounded-[50%] border border-gold/60" />}
@@ -204,27 +241,41 @@ export function CreatePage() {
       >
         <div className="flex-1 px-5 pt-5 sm:px-8 lg:pt-10">
           <div className="flex items-center justify-between gap-3">
-            <h1 className="text-2xl font-semibold leading-tight">ประกอบกระทง</h1>
-            {!compact && (
-            <div className="flex shrink-0 items-center">
+            <h1 className={step >= WISH_STEP ? 'sr-only' : 'text-2xl font-semibold leading-tight'}>ประกอบกระทง</h1>
+            {step < WISH_STEP && (
+            <div className="flex shrink-0 items-center gap-1">
               <button
                 type="button"
-                onClick={() => draft.setDesign({ ...randomDesign(), coins: draft.coinAmount !== null })}
+                onClick={() => draft.setDesign(randomDesign())}
                 disabled={submitting}
                 className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm text-gold hover:bg-gold/10"
               >
                 <Shuffle className="size-4" aria-hidden />
                 สุ่มให้
               </button>
-              <button
-                type="button"
-                onClick={draft.resetDesign}
-                disabled={submitting}
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm text-mist hover:text-ink"
-              >
-                <RotateCcw className="size-4" aria-hidden />
-                เริ่มใหม่
-              </button>
+              {undoDesign ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    draft.setDesign(undoDesign);
+                    setUndoDesign(null);
+                  }}
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-ink/20 px-3 text-sm text-ink hover:border-gold/60"
+                >
+                  <Undo2 className="size-4" aria-hidden />
+                  ย้อนคืน
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={reset}
+                  disabled={submitting || isBare}
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm text-mist hover:text-ink disabled:opacity-40"
+                >
+                  <RotateCcw className="size-4" aria-hidden />
+                  เริ่มใหม่
+                </button>
+              )}
             </div>
             )}
           </div>
@@ -232,7 +283,7 @@ export function CreatePage() {
           <nav aria-label="ขั้นตอนประกอบกระทง" className="mt-5">
             <ol className="grid grid-cols-4 gap-1.5">
               {STEPS.map((s, i) => {
-                const done = i < step;
+                const done = isDone(i);
                 const active = i === step;
                 return (
                   <li key={s.id}>
@@ -261,9 +312,12 @@ export function CreatePage() {
           </nav>
 
           <div className="pb-8 pt-6">
-            <h2 ref={headingRef} tabIndex={-1} className="mb-5 text-lg font-semibold text-ink focus:outline-none">
+            <h2 ref={headingRef} tabIndex={-1} className="text-lg font-semibold text-ink focus:outline-none">
               {current.title}
             </h2>
+            <p className="mb-5 mt-1 text-sm text-mist">
+              {current.id === 'decor' && isBare ? 'กระทงยังโล่งอยู่ เริ่มจากจุดเทียนแล้วเติมดอกไม้ได้เลย' : current.hint}
+            </p>
 
             {current.id === 'base' && (
               <div className="space-y-7">
@@ -273,7 +327,7 @@ export function CreatePage() {
                   options={SHAPES}
                   value={draft.design.shape}
                   onChange={(v) => draft.setPart('shape', v)}
-                  preview={(shape) => ({ ...draft.design, shape })}
+                  preview={(shape) => ({ ...showcase, shape })}
                 />
                 <ThumbPicker
                   label="ฐาน"
@@ -281,14 +335,13 @@ export function CreatePage() {
                   options={BASES}
                   value={draft.design.base}
                   onChange={(v) => draft.setPart('base', v)}
-                  preview={(base) => ({ ...draft.design, base })}
+                  preview={(base) => ({ ...showcase, base })}
                 />
               </div>
             )}
 
             {current.id === 'decor' && (
               <div className="space-y-7">
-                <FlowerPicker options={FLOWERS} value={draft.design.flowers} onToggle={draft.toggleFlower} />
                 <ChoicePicker
                   label="เทียน"
                   name="candle"
@@ -297,12 +350,14 @@ export function CreatePage() {
                   onChange={(v) => draft.setPart('candle', v)}
                   noneLabel="ไม่ใส่"
                 />
+                <SwitchRow label="ธูป 3 ดอก" checked={draft.design.incense} onChange={(v) => draft.setPart('incense', v)} />
+                <FlowerPicker options={FLOWERS} value={draft.design.flowers} onToggle={draft.toggleFlower} />
                 <details className="group rounded-2xl border border-ink/12 bg-surface/40 open:bg-surface/60">
                   <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 [&::-webkit-details-marker]:hidden">
                     <span>
                       <span className="block font-medium text-ink">ของประดับเพิ่ม</span>
                       <span className="block text-sm text-mist">
-                        ลูกปัด ธูป มาลัย เหรียญ{extrasOn > 0 ? ` ใส่อยู่ ${extrasOn} อย่าง` : ''}
+                        ลูกปัด มาลัย เงิน{extrasOn > 0 ? ` ใส่อยู่ ${extrasOn} อย่าง` : ''}
                       </span>
                     </span>
                     <ChevronDown className="size-5 shrink-0 text-mist transition-transform group-open:rotate-180" aria-hidden />
@@ -317,7 +372,6 @@ export function CreatePage() {
                       noneLabel="ไม่ใส่"
                     />
                     <div className="space-y-2">
-                      <SwitchRow label="ธูป 3 ดอก" checked={draft.design.incense} onChange={(v) => draft.setPart('incense', v)} />
                       <SwitchRow
                         label="มาลัยมะลิ"
                         hint="ร้อยรอบขอบ มีดอกกุหลาบห้อยด้านหน้า"
@@ -326,11 +380,8 @@ export function CreatePage() {
                       />
                     </div>
                     <CoinPicker
-                      value={draft.coinAmount}
-                      onChange={(coinAmount) => {
-                        draft.setField({ coinAmount });
-                        draft.setPart('coins', coinAmount !== null);
-                      }}
+                      money={draft.design.money}
+                      onMoneyChange={draft.setMoney}
                     />
                   </div>
                 </details>
@@ -492,6 +543,28 @@ export function CreatePage() {
 
         {/* Thumb-reach controls: always at the bottom of the screen, whatever the step. */}
         <div className="sticky bottom-0 z-20 border-t border-ink/10 bg-night/92 px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:px-8">
+          {bareNudge && (
+            <div role="status" className="mb-3 rounded-2xl border border-gold/30 bg-surface p-4">
+              <p className="font-medium text-ink">กระทงยังไม่มีเทียนกับดอกไม้เลยนะ</p>
+              <p className="mt-0.5 text-sm text-mist">ลอยแบบเรียบๆ ก็ได้ หรือให้ช่วยแต่งให้ก่อนก็ได้</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    draft.setDesign({ ...randomDesign(), shape: draft.design.shape, base: draft.design.base });
+                    setBareNudge(false);
+                  }}
+                  className="flex-1"
+                >
+                  <Shuffle className="size-4" aria-hidden />
+                  สุ่มแต่งให้
+                </Button>
+                <Button variant="ghost" onClick={() => goTo(step + 1)} className="flex-1">
+                  ลอยแบบเรียบๆ
+                </Button>
+              </div>
+            </div>
+          )}
           <div className="flex gap-2">
             {step > 0 && (
               <Button variant="ghost" onClick={() => goTo(step - 1)} disabled={submitting} className="px-5">
@@ -499,7 +572,7 @@ export function CreatePage() {
               </Button>
             )}
             {step < FLOAT_STEP ? (
-              <Button onClick={() => goTo(step + 1)} className="flex-1">
+              <Button onClick={forward} className="flex-1">
                 {step === WISH_STEP ? 'พร้อมลอยแล้ว' : `ถัดไป ${next?.label ?? ''}`}
               </Button>
             ) : (

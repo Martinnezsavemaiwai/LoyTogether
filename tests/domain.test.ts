@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DESIGN, flowerPhases, isValidDesign, normalizeDesign, randomDesign } from '@/features/krathong/options';
+import { BLANK_DESIGN, DEFAULT_DESIGN, flowerPhases, isValidDesign, normalizeDesign, randomDesign } from '@/features/krathong/options';
+import { breakdownMoney, describeMoney, moneyLayers } from '@/features/krathong/money';
 import { RIVERS, getRiver, riverByRoomId } from '@/features/rivers/rivers';
 import {
   crossingProgress,
@@ -199,5 +200,89 @@ describe('randomDesign', () => {
   it('stays valid at the edges of the random source', () => {
     expect(isValidDesign(randomDesign(() => 0))).toBe(true);
     expect(isValidDesign(randomDesign(() => 0.999999))).toBe(true);
+  });
+});
+
+describe('BLANK_DESIGN', () => {
+  it('is a valid bare krathong with nothing on it', () => {
+    expect(isValidDesign(BLANK_DESIGN)).toBe(true);
+    expect(BLANK_DESIGN.flowers).toEqual([]);
+    expect(BLANK_DESIGN.candle).toBeNull();
+    expect(BLANK_DESIGN.beads).toBeNull();
+    expect(BLANK_DESIGN.incense).toBe(false);
+    expect(BLANK_DESIGN.garland).toBe(false);
+  });
+
+  it('does not change how incomplete stored designs are filled in', () => {
+    expect(normalizeDesign({})).toEqual(DEFAULT_DESIGN);
+  });
+});
+
+describe('money in the design', () => {
+  it('accepts a whole-baht amount as an optional ninth key', () => {
+    expect(isValidDesign({ ...BLANK_DESIGN, money: 1 })).toBe(true);
+    expect(isValidDesign({ ...BLANK_DESIGN, money: 99_999 })).toBe(true);
+    expect(isValidDesign(BLANK_DESIGN)).toBe(true);
+  });
+
+  it('rejects fractions, zero, too much, strings and unknown keys', () => {
+    expect(isValidDesign({ ...BLANK_DESIGN, money: 0 })).toBe(false);
+    expect(isValidDesign({ ...BLANK_DESIGN, money: 12.5 })).toBe(false);
+    expect(isValidDesign({ ...BLANK_DESIGN, money: 100_000 })).toBe(false);
+    expect(isValidDesign({ ...BLANK_DESIGN, money: '100' })).toBe(false);
+    expect(isValidDesign({ ...BLANK_DESIGN, money: undefined })).toBe(false);
+    expect(isValidDesign({ ...BLANK_DESIGN, extra: true })).toBe(false);
+  });
+
+  it('keeps a valid amount and drops a bad one when normalizing', () => {
+    expect(normalizeDesign({ shape: 'heart', money: 500 }).money).toBe(500);
+    expect('money' in normalizeDesign({ shape: 'heart', money: -7 })).toBe(false);
+  });
+});
+
+describe('breakdownMoney', () => {
+  it('counts out the largest notes and coins first', () => {
+    expect(breakdownMoney(1888)).toEqual({
+      notes: [
+        { value: 1000, count: 1 },
+        { value: 500, count: 1 },
+        { value: 100, count: 3 },
+        { value: 50, count: 1 },
+        { value: 20, count: 1 },
+      ],
+      coins: [
+        { value: 10, count: 1 },
+        { value: 5, count: 1 },
+        { value: 2, count: 1 },
+        { value: 1, count: 1 },
+      ],
+    });
+  });
+
+  it('always adds back up to the amount', () => {
+    for (const amount of [1, 9, 19, 20, 99, 120, 345, 999, 2569, 99_999]) {
+      const { notes, coins } = breakdownMoney(amount);
+      const sum = [...notes, ...coins].reduce((t, p) => t + p.value * p.count, 0);
+      expect(sum).toBe(amount);
+    }
+  });
+
+  it('gives nothing for an invalid amount', () => {
+    expect(breakdownMoney(0)).toEqual({ notes: [], coins: [] });
+    expect(breakdownMoney(3.5)).toEqual({ notes: [], coins: [] });
+  });
+
+  it('describes the pieces in Thai', () => {
+    expect(describeMoney(130)).toBe('แบงก์ 100 1 ใบ, แบงก์ 20 1 ใบ, เหรียญ 10 1 เหรียญ');
+  });
+
+  it('puts the largest notes on the front skewers and caps what is drawn', () => {
+    const { notes, coins } = moneyLayers(1888);
+    expect(notes.map((n) => n.key)).toEqual(['note-100-s2', 'note-100-s3', 'note-1000-s0', 'note-500-s1']);
+    expect(coins.map((c) => c.key)).toEqual(['coin-10-s0', 'coin-5-s1', 'coin-2-s2', 'coin-1-s3']);
+    const lots = moneyLayers(99_999);
+    expect(lots.notes).toHaveLength(4);
+    expect(lots.coins.map((c) => c.key)).toEqual(['coin-5-s0', 'coin-2-s1', 'coin-2-s2']);
+    expect(moneyLayers(0)).toEqual({ notes: [], coins: [] });
   });
 });

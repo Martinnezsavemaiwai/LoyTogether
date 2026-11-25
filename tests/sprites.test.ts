@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { liftPercent, spriteLayers } from '@/features/krathong/KrathongArt';
 import { BASES, BEADS, CANDLES, DEFAULT_DESIGN, FLOWERS, SHAPES } from '@/features/krathong/options';
+import { COIN_SLOTS, COIN_VALUES, NOTE_SLOTS, NOTE_VALUES } from '@/features/krathong/money';
 import { RIVERS } from '@/features/rivers/rivers';
 import type { KrathongDesign } from '@/types/domain';
 
@@ -21,6 +22,15 @@ describe('rendered krathong sprites', () => {
       check(full({ shape, garland: true, coins: true, incense: true }));
     }
     expect([...missing]).toEqual([]);
+  });
+
+  it('has a money sprite for every note and coin in every slot', () => {
+    const missing = [
+      ...NOTE_VALUES.flatMap((v) => Array.from({ length: NOTE_SLOTS }, (_, s) => `/krathong/note-${v}-s${s}.webp`)),
+      ...COIN_VALUES.flatMap((v) => Array.from({ length: COIN_SLOTS }, (_, s) => `/krathong/coin-${v}-s${s}.webp`)),
+    ].filter((src) => !existsSync(`public${src}`));
+    expect(missing).toEqual([]);
+    expect(spriteLayers(full({ money: 1888 })).filter((l) => /^(note|coin)-/.test(l.key))).toHaveLength(8);
   });
 
   it('stacks layers back to front and skips parts that are left out', () => {
