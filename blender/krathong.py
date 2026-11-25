@@ -895,10 +895,17 @@ def candle(colour, coll, top):
     # the top has melted into a shallow pool with a raised lip, as a lit candle does
     bm = lathe_bm([(0.011, 0), (0.011, 0.1), (0.0108, 0.1035), (0.0094, 0.1032), (0.006, 0.1006), (0.0, 0.1)], seg=32)
     o = obj(f"Candle_{colour}", bm, body, coll, loc=(0, 0, top))
-    for i in range(4):
-        a = i * 1.7
-        drip = scaled(uv_sphere(0.003, 10, 8), 1, 1, 3)
-        obj(f"Drip_{colour}_{i}", drip, body, coll, loc=(math.sin(a) * 0.011, math.cos(a) * 0.011, top + 0.09 - i * 0.008))
+    # wax runs over the lip and down the side, each run thin where it flowed and swelling
+    # into a rounded bead where it set; half sunk into the candle so it hugs the surface
+    rim = 0.1035
+    for i, (deg, length, w) in enumerate(((-95, 0.034, 0.0021), (-128, 0.018, 0.0018), (-58, 0.026, 0.0019),
+                                          (-20, 0.012, 0.0016), (-165, 0.04, 0.002), (25, 0.022, 0.0017))):
+        a = math.radians(deg)
+        prof = [(0.0, 0.0), (w * 1.25, w * 0.5), (w * 1.4, w * 1.4), (w * 1.05, w * 2.6), (w * 0.8, length * 0.45),
+                (w * 0.95, length * 0.8), (w * 1.25, length), (0.0, length + w * 0.9)]
+        drip = scaled(lathe_bm(prof, seg=12), 0.55, 1, 1)  # flattened against the candle
+        obj(f"Drip_{colour}_{i}", drip, body, coll,
+            loc=(math.cos(a) * 0.0104, math.sin(a) * 0.0104, top + rim - length), rot=(0, 0, a))
     wick = principled("Wick", (0.05, 0.03, 0.02), rough=0.9)
     obj(f"Wick_{colour}", lathe_bm([(0.0008, 0), (0.0008, 0.009), (0, 0.01)], 6), wick, coll, loc=(0, 0, top + 0.0995))
     flame = principled("Flame", (1, 0.6, 0.2), emit=(1.0, 0.62, 0.22), strength=40)
@@ -945,24 +952,51 @@ def beads(colour, shape, front, back, top):
         obj(f"Strand_{shape}_{colour}_{i}", uv_sphere(0.0028, 10, 6), m, front, loc=(x, y, z))
 
 
+def malai_rope(name, pts, pick, bud, accent, every=9, per=4):
+    """A strand of threaded jasmine buds (มาลัย): `per` buds round the thread at each step,
+    tips leaning along the strand so they lie like scales, and a red band every `every` steps.
+    `pick(point)` returns the collection a step belongs in."""
+    n = len(pts)
+    for k, p in enumerate(pts):
+        t = (pts[min(k + 1, n - 1)] - pts[max(k - 1, 0)]).normalized()
+        n1 = t.cross(Vector((0, 0, 1)))
+        n1 = n1.normalized() if n1.length > 1e-6 else Vector((1, 0, 0))
+        n2 = t.cross(n1).normalized()
+        band = every and k % every == every // 2
+        for j in range(per):
+            ang = j * math.tau / per + k * 1.1
+            out = n1 * math.cos(ang) + n2 * math.sin(ang)
+            d = (out * 0.55 + t * 0.85).normalized()  # laid along the thread, overlapping like scales
+            prof = ([(0.0, 0), (0.0021, 0.0012), (0.0026, 0.0034), (0.0, 0.0052)] if band else
+                    [(0.0, 0), (0.0013, 0.0008), (0.0023, 0.0034), (0.0019, 0.0056), (0.0, 0.008)])
+            place(f"{name}_{k}_{j}", lathe_bm(prof, seg=10), accent if band else bud, pick(p),
+                  Matrix.Translation(p + out * 0.0009) @ d.to_track_quat("Z", "Y").to_matrix().to_4x4())
+
+
 def garland(shape, front, back, top):
-    """Jasmine buds round the rim and a jasmine swag with a rose and leaf tassel at the front."""
-    m = principled("Jasmine", (0.97, 0.96, 0.9), rough=0.4, sss=0.5)
-    rose = principled("Rose", (0.5, 0.02, 0.06), rough=0.45, sss=0.4)
+    """A jasmine malai: a rope of threaded buds round the rim with red bands, a swag across
+    the front, and a hanging tassel (อุบะ) of buds under a rose, finished with leaf tips."""
+    bud = gradient_mat("MalaiBud", (0.6, 0.72, 0.42), (0.99, 0.98, 0.94), rough=0.38, sss=0.5, axis="Z")
+    accent = principled("MalaiRose", (0.45, 0.01, 0.05), rough=0.45, sss=0.2)
     leaf = leaf_mat("LeafLight", (0.04, 0.2, 0.045))
-    for i, (x, y) in enumerate(shape_outline(shape, 28)):
-        obj(f"Bud_{shape}_{i}", scaled(uv_sphere(0.0035, 8, 6), 1, 1, 1.5), m, back if y > 0 else front,
-            loc=(x * R * 0.8, y * R * 0.8, top + 0.004))
-    for i in range(40):
-        u = i / 39
-        x = -R * 0.85 + u * R * 1.7
-        y = -R * 0.66 - math.sin(u * math.pi) * R * 0.26
-        z = top - 0.008 - math.sin(u * math.pi) * 0.024
-        bud = scaled(uv_sphere(0.0042, 10, 8), 1, 1, 1.6)
-        obj(f"Garland_{shape}_{i}", bud, rose if i == 20 else m, front, loc=(x, y, z), rot=(0.6, 0, u * 3))
-    for side in (-1, 1):
-        obj(f"Tassel_{shape}_{side}", petal_bm(0.02, 0.01, cup=0.4), leaf, front,
-            loc=(side * 0.004, -R * 0.94, top - 0.034), rot=(-2.2, 0, 0))
+    side = lambda p: back if p.y > 0 else front
+    rim = [Vector((x * R * 0.8, y * R * 0.8, top + 0.004)) for x, y in shape_outline(shape, 120)]
+    malai_rope(f"Malai_{shape}", rim, side, bud, accent, every=12)
+    swag = []
+    for i in range(84):
+        u = i / 83
+        swag.append(Vector((-R * 0.85 + u * R * 1.7, -R * 0.66 - math.sin(u * math.pi) * R * 0.26,
+                            top - 0.006 - math.sin(u * math.pi) * 0.018)))
+    malai_rope(f"Swag_{shape}", swag, lambda p: front, bud, accent, every=14)
+    # the tassel hangs from the lowest point of the swag
+    hang = swag[len(swag) // 2] + Vector((0, -0.002, -0.003))
+    rose_head(f"TasselRose_{shape}", front, hang.x, hang.y - 0.002, hang.z - 0.005, 0.5, random.Random(3))
+    drop = [hang + Vector((0, -0.0005 * k, -0.004 - 0.0026 * k)) for k in range(4)]
+    malai_rope(f"Tassel_{shape}", drop, lambda p: front, bud, accent, every=0, per=4)
+    for k in range(3):
+        a = k * math.tau / 3
+        obj(f"TasselLeaf_{shape}_{k}", petal2_bm(0.009, 0.005, cup=0.5, curl=0.0, point=0.9, seg=8, cols=4, taper=1.0),
+            leaf, front, loc=drop[-1] + Vector((0, 0, -0.001)), rot=(-2.4, 0, a))
 
 
 def coins(shape, coll, top):
