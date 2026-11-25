@@ -723,6 +723,106 @@ def point(name, loc, power, color, radius=1.0):
     return link(ob)
 
 
+# --------------------------------------------------------------------------- festival
+
+
+def view_height(dist, margin=0.92):
+    """Highest z still inside the frame at `dist` metres in front of the camera."""
+    cam = bpy.context.scene.camera.data
+    half_h = math.atan(cam.sensor_width * 10 / 16 / 2 / cam.lens)
+    return CAM_H + math.tan(half_h) * (dist + 10) * margin
+
+
+def view_half_width(dist, margin=0.98):
+    cam = bpy.context.scene.camera.data
+    return math.tan(math.atan(cam.sensor_width / 2 / cam.lens)) * (dist + 10) * margin
+
+
+def sky_lanterns(seed, n, y0, y1, source_x=0.0, spread=0.6, low_share=0.55):
+    """Khom loi (Yi Peng) paper lanterns drifting up: a slim open-bottomed paper bell lit
+    from the burner inside, brightest at the bottom. Most hang low and far where the crowd
+    released them; fewer climb high, and they thin out with height."""
+    rnd = random.Random(seed)
+    paper = []
+    for k, c in enumerate(((1.0, 0.42, 0.07), (1.0, 0.5, 0.12), (1.0, 0.36, 0.05))):
+        m = bpy.data.materials.new(f"Khom{k}")
+        nt = m.node_tree
+        b = next(nd for nd in nt.nodes if nd.type == "BSDF_PRINCIPLED")
+        b.inputs["Base Color"].default_value = (*c, 1)
+        geo = nt.nodes.new("ShaderNodeTexCoord")
+        sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+        nt.links.new(geo.outputs["Generated"], sep.inputs[0])
+        rng = nt.nodes.new("ShaderNodeMapRange")
+        rng.inputs["To Min"].default_value = 4.0  # hot at the burner
+        rng.inputs["To Max"].default_value = 1.0
+        nt.links.new(sep.outputs["Z"], rng.inputs["Value"])
+        b.inputs["Emission Color"].default_value = (*c, 1)
+        nt.links.new(rng.outputs[0], b.inputs["Emission Strength"])
+        paper.append(m)
+    for i in range(n):
+        y = rnd.uniform(y0, y1)
+        # low and dense near the release point, sparse and high elsewhere
+        hmax = view_height(y)
+        t = rnd.random() ** (2.2 if rnd.random() < low_share else 0.9)
+        z = 12 + t * (hmax - 12)
+        half = view_half_width(y)
+        x = source_x + rnd.gauss(0, half * spread)
+        x = max(-half, min(half, x))
+        s = rnd.uniform(0.85, 1.15) * (1 + y / 900)  # far ones a touch bigger so they still read
+        ob = lathe(f"Khom{seed}_{i}", [(0.42 * s, 0), (0.55 * s, 0.6 * s), (0.6 * s, 1.15 * s), (0.5 * s, 1.5 * s), (0.0, 1.62 * s)],
+                   (x, y, z), paper[i % 3], segments=8, smooth=True)
+        ob.rotation_euler = (rnd.uniform(-0.12, 0.12), rnd.uniform(-0.12, 0.12), 0)
+
+
+def distant_krathongs(seed, n, y0, y1, x_scale=1.0, max_x=1e9):
+    """Other people's krathongs already out on the water: a candle flame and a faint lit
+    ring of flowers each, scattered thicker toward the far bank where they drift."""
+    rnd = random.Random(seed)
+    flame = mat("KrathongFlame", (1, 1, 1), emit=(1.0, 0.55, 0.18), strength=14)
+    ring = mat("KrathongRing", (0.3, 0.2, 0.08), rough=0.6, emit=(1.0, 0.55, 0.25), strength=0.9)
+    for i in range(n):
+        y = y0 + (y1 - y0) * rnd.random() ** 0.6
+        half = min(view_half_width(y) * x_scale, max_x)
+        x = rnd.uniform(-half, half)
+        sphere(f"Krathong{seed}_{i}", 0.16, (x, y, 0.42), flame, scale=(1, 1, 1.6), subdiv=1)
+        lathe(f"KrathongBase{seed}_{i}", [(0.5, 0), (0.55, 0.18), (0.35, 0.26)], (x, y, 0.02), ring, segments=8)
+
+
+def firework(name, centre, radius, colour, rays=40, sparks=7, seed=0):
+    """A peony burst: sparks thrown out along rays, each trail fading and thinning toward
+    the centre, the tips brightest, the whole shell drooping a little as it falls."""
+    rnd = random.Random(seed)
+    cx, cy, cz = centre
+    mats = [mat(f"{name}Spark{k}", (1, 1, 1), emit=colour, strength=strength)
+            for k, strength in enumerate((9, 4, 1.6))]
+    for i in range(rays):
+        # spread the rays evenly over a sphere, then flatten toward the viewer a touch
+        zz = 1 - 2 * (i + 0.5) / rays
+        a = i * math.pi * (3 - math.sqrt(5))
+        rr = math.sqrt(1 - zz * zz)
+        d = Vector((math.cos(a) * rr, math.sin(a) * rr * 0.4, zz))
+        L = radius * rnd.uniform(0.85, 1.1)
+        for k in range(sparks):
+            t = (k + 1) / sparks
+            p = Vector((cx, cy, cz)) + d * L * t - Vector((0, 0, radius * 0.18 * t * t))
+            tier = 0 if k == sparks - 1 else (1 if k >= sparks - 3 else 2)
+            sphere(f"{name}_{i}_{k}", radius * 0.016 * (0.5 + t), tuple(p), mats[tier], subdiv=1)
+
+
+def lantern_string(name, pts, colours, per=10, size=0.45, strength=14):
+    """Paper lanterns hung on a line between posts: each span sags in a catenary."""
+    mats = [mat(f"{name}Paper{k}", (1, 1, 1), emit=c, strength=strength) for k, c in enumerate(colours)]
+    k = 0
+    for a, b in zip(pts, pts[1:]):
+        for j in range(per):
+            t = (j + 0.5) / per
+            x = a[0] + (b[0] - a[0]) * t
+            y = a[1] + (b[1] - a[1]) * t
+            z = a[2] + (b[2] - a[2]) * t - math.sin(t * math.pi) * 1.2
+            sphere(f"{name}_{k}", size, (x, y, z), mats[k % len(mats)], scale=(1, 1, 1.25), subdiv=1)
+            k += 1
+
+
 # --------------------------------------------------------------------------- landmarks
 
 
@@ -997,6 +1097,9 @@ def wat_arun():
         express_boat("Express", 62, 232, 28, heading=math.radians(178))
     bamboo_pier("Tha", 46, y + 2, 12, width=5)
     longtail_boat("Longtail", 36, 112, 11, heading=math.radians(200))
+    distant_krathongs(70, 55, 120, y - 6)
+    lantern_string("PierKhom", [(40 + i * 3, y + 2, 4.2) for i in range(5)],
+                   [(1.0, 0.55, 0.18), (1.0, 0.3, 0.25), (1.0, 0.8, 0.45)], per=4, size=0.35)
     if SPRITE == "cruise":
         cruise_boat("Cruise", 0, 175, 36, heading=0.0)
 
@@ -1035,12 +1138,54 @@ def lumphini():
     bamboo_pier("SwanPier", -38, 74, 8, width=4)
     for i, (sx, sy, hd) in enumerate(((-44, 64, 0.3), (-39, 62, 0.1), (-34, 65, -0.2), (-29, 63, 0.2), (36, 92, 2.9))):
         swan_boat(f"SwanBoat{i}", sx, sy, s=1.0, heading=hd)
+    distant_krathongs(71, 45, 110, y - 6)
+    lantern_string("SwanKhom", [(-44 + i * 3, 74, 3.6) for i in range(5)],
+                   [(1.0, 0.55, 0.18), (1.0, 0.3, 0.25), (1.0, 0.8, 0.45)], per=3, size=0.3)
+
+
+def lotus_bud_tower(name, x, y, z0, height, w, material):
+    """The lotus-bud chedi of Wat Mahathat Sukhothai on its own: a redented square body in
+    three diminishing tiers, a narrow neck, then the closed lotus bud on a ribbed collar and
+    a tall pinnacle of stacked rings."""
+    prof = [(w / 2, 0), (w / 2, height * 0.12), (w * 0.44, height * 0.13), (w * 0.44, height * 0.22),
+            (w * 0.38, height * 0.23), (w * 0.38, height * 0.3), (w * 0.3, height * 0.31), (w * 0.3, height * 0.36)]
+    redented_lathe(name + "Body", prof, (x, y, z0), material, corners=5, notch=0.84)
+    zb = z0 + height * 0.36
+    # collar of upturned petals, then the bud itself: full at the shoulder, drawn to a point
+    lathe(name + "Collar", [(w * 0.22, 0), (w * 0.3, height * 0.025), (w * 0.27, height * 0.05)],
+          (x, y, zb), material, segments=16)
+    r = w * 0.25
+    lathe(name + "Bud", [(r * 0.78, 0), (r * 1.05, height * 0.05), (r * 1.1, height * 0.1), (r * 0.95, height * 0.17),
+                         (r * 0.6, height * 0.23), (r * 0.22, height * 0.27), (r * 0.12, height * 0.28)],
+          (x, y, zb + height * 0.05), material, segments=16, smooth=True)
+    zp = zb + height * 0.33
+    rings = [(r * 0.16, 0), (r * 0.2, height * 0.01), (r * 0.13, height * 0.02)]
+    zz = height * 0.02
+    for k in range(6):  # stacked rings narrowing up the pinnacle
+        rr = r * 0.13 * (1 - k / 7)
+        rings += [(rr * 1.4, zz + height * 0.008), (rr, zz + height * 0.02)]
+        zz += height * 0.028
+    rings += [(r * 0.03, zz + height * 0.05), (0.0, zz + height * 0.12)]
+    lathe(name + "Pinnacle", rings, (x, y, zp), material, segments=12)
+
+
+def attharot_mondop(name, x, y, h, brick, plaster):
+    """One of the two brick mondops beside the main chedi, each open to the front with a
+    huge standing Buddha (Phra Attharot) filling it, his head clearing the broken walls."""
+    w, d = h * 0.42, h * 0.28
+    box(name + "Back", w, 1.6, h * 0.86, (x, y + d / 2, 0), brick)
+    for side in (-1, 1):
+        box(f"{name}Wall{side}", 1.6, d, h * 0.8, (x + side * (w / 2 - 0.8), y, 0), brick)
+    box(name + "Step", w + 2, d + 2, 1.2, (x, y, 0), brick)
+    standing_buddha(name + "Buddha", x, y - 0.5, h, plaster)
 
 
 def sukhothai():
-    """Wat Mahathat, Sukhothai Historical Park, across the moat: the lotus-bud chedi on its
-    square base, four Khmer-style corner towers, smaller chedis, the vihara's laterite
-    columns with a seated Buddha among them, sugar palms either side."""
+    """Wat Mahathat, Sukhothai Historical Park, across the moat on Loy Krathong Tian Phao
+    night: the lotus-bud chedi on its square base ringed by four Khmer corner towers, the
+    two brick mondops of the standing Buddhas either side, smaller lotus-bud chedis, the
+    vihara's laterite columns with a seated Buddha among them, candles along the moat,
+    krathongs on the water and fireworks over the ruins."""
     lens(45)
     world(top=(0.003, 0.004, 0.016), horizon=(0.035, 0.03, 0.07), glow=(1.0, 0.5, 0.2), glow_amt=0.18)
     moon(0.111, 0.333, size_deg=3.6)
@@ -1049,21 +1194,22 @@ def sukhothai():
     stone = lit_stone("Laterite", warm=(1.0, 0.55, 0.25), strength=2.4, pattern="laterite")
     brick = lit_stone("Brick", warm=(1.0, 0.42, 0.2), strength=1.6, pattern="brick")
     plaster = lit_stone("Plaster", warm=(1.0, 0.72, 0.45), strength=2.0)
+    white = lit_stone("BuddhaPlaster", warm=(1.0, 0.86, 0.7), strength=2.6)
     cy = y + 48
     stepped_base("Platform", 0, y + 25, 150, 1.6, 1, brick)
-    stepped_base("MahathatBase", 0, cy, 30, 16, 3, brick)
-    box("MahathatBody", 13, 13, 14, (0, cy, 16), stone)
-    box("Niche", 5, 1, 8, (0, cy - 6.6, 18), mat("NicheDark", (0.02, 0.012, 0.008)))
-    for k, w in enumerate((12, 10, 8)):
-        box(f"MahathatNeck{k}", w, w, 2, (0, cy, 30 + k * 2), stone)
-    r = 6.2
-    lathe("MahathatBud", [(r * 0.8, 0), (r * 1.1, 4), (r * 1.0, 11), (r * 0.65, 17), (r * 0.25, 21),
-                          (r * 0.1, 22), (r * 0.08, 34), (0, 37)], (0, cy, 36), stone, segments=8)
-    # four corner towers in Khmer style, on the corners of the base
+    # the main chedi: three square terraces, then the lotus-bud tower
+    terrace("MahathatT0", 0, cy, 30, 4, brick, corners=3)
+    terrace("MahathatT1", 0, cy, 25, 8, brick, corners=3)
+    terrace("MahathatT2", 0, cy, 20, 12, brick, corners=3)
+    lotus_bud_tower("Mahathat", 0, cy, 12, 46, 16, stone)
+    # four Khmer-style corner towers on the corners of the base
     for i, (dx, dy) in enumerate(((-14, -14), (14, -14), (-14, 14), (14, 14))):
         prang(f"Corner{i}", dx, cy + dy, 22, 2.6, plaster, tiers=6, segments=8)
-    for i, dx in enumerate((-40, -28, 28, 40)):
-        lotus_bud_chedi(f"Small{i}", dx, cy + 6, 16 if abs(dx) > 30 else 19, 7, stone)
+    # the standing Buddhas in their mondops either side
+    for i, dx in enumerate((-27, 27)):
+        attharot_mondop(f"Attharot{i}", dx, cy + 2, 17, brick, white)
+    for i, dx in enumerate((-44, 44)):
+        lotus_bud_chedi(f"Small{i}", dx, cy + 6, 17, 7, stone)
     # vihara in front: columns in rows, a big seated Buddha at the back of the hall
     band = mat("PillarBand", (0.6, 0.55, 0.5), emit=(1.0, 0.75, 0.5), strength=0.6)
     for i, dx in enumerate((-24, -17, -10, 10, 17, 24)):
@@ -1072,59 +1218,127 @@ def sukhothai():
             for k in range(hh):
                 box(f"Pillar{i}{row}_{k}", 1.9, 1.9, 3.0, (dx, y + 22 + dy, 1.6 + k * 3.2), stone)
                 box(f"PillarBand{i}{row}_{k}", 2.0, 2.0, 0.25, (dx, y + 22 + dy, 4.6 + k * 3.2), band)
-    seated_buddha("Buddha", 0, y + 32, 1.6, 13, plaster)
+    seated_buddha("Buddha", 0, y + 32, 1.6, 13, white)
     dark = mat("Palm", (0.006, 0.008, 0.01), rough=0.9)
     for i, (dx, h) in enumerate(((-92, 22), (-80, 18), (84, 24), (98, 19), (-140, 20), (135, 21))):
         sugar_palm(f"Palm{i}", dx, y + 18, h, dark)
     tree_cluster(6, -260, -110, y + 45, 16, dark, h=(8, 14))
     tree_cluster(7, 110, 260, y + 45, 16, dark, h=(8, 14))
-    # candles along the moat edge for Loy Krathong Tian Phao
+    # candles along the moat edge and round the platform for Tian Phao
     lamp_row(8, -80, 80, y + 4, 1.2, 70, (1.0, 0.68, 0.3), strength=40, size=0.25)
+    lamp_row(9, -74, 74, y + 12.5, 1.9, 60, (1.0, 0.7, 0.32), strength=30, size=0.2)
     point("ChediGlow", (0, y + 12, 10), 40000, (1.0, 0.65, 0.35), radius=15)
+    distant_krathongs(10, 60, 110, y - 4)
+    # the fireworks of the festival, high on the right, clear of the moon and the chedi
+    firework("FwGold", (150, y + 420, 125), 34, (1.0, 0.5, 0.06), seed=1)
+    firework("FwPink", (205, y + 520, 95), 26, (1.0, 0.1, 0.38), rays=34, seed=2)
+    firework("FwGreen", (-185, y + 480, 105), 24, (0.15, 1.0, 0.3), rays=30, seed=3)
+
+
+def ridge(name, y, x0, x1, profile, material, n=160):
+    """A far hill range as a vertical curtain whose top follows profile(u), u 0..1 across."""
+    bm = bmesh.new()
+    top, bot = [], []
+    for i in range(n + 1):
+        u = i / n
+        x = x0 + (x1 - x0) * u
+        top.append(bm.verts.new((x, 0, max(profile(u), 1.0))))
+        bot.append(bm.verts.new((x, 0, -5.0)))
+    for i in range(n):
+        bm.faces.new((bot[i], bot[i + 1], top[i + 1], top[i]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    tops = [(v.co.x, v.co.z) for v in top]
+    return mesh_ob(name, bm, material, loc=(0, y, 0)), tops
+
+
+def truss_bridge(name, y, x0, x1, deck_z, depth, panels, steel, deck_mat, lamp):
+    """Chiang Mai's old Iron Bridge (Saphan Lek): a footbridge of riveted Warren trusses on
+    two river piers, its top chords hung with lanterns for the festival."""
+    length = x1 - x0
+    box(name + "Deck", length, 5.5, 0.5, ((x0 + x1) / 2, y, deck_z), deck_mat)
+    step = length / panels
+    for side in (-1, 1):
+        yy = y + side * 2.8
+        box(f"{name}Bottom{side}", length, 0.35, 0.45, ((x0 + x1) / 2, yy, deck_z + 0.4), steel)
+        box(f"{name}Top{side}", length, 0.35, 0.45, ((x0 + x1) / 2, yy, deck_z + depth), steel)
+        for i in range(panels + 1):
+            box(f"{name}Post{side}_{i}", 0.3, 0.3, depth, (x0 + i * step, yy, deck_z + 0.4), steel)
+        for i in range(panels):
+            diag = math.hypot(step, depth)
+            lean = math.atan2(step, depth) * (1 if i % 2 else -1)
+            # a diagonal from one panel corner at the deck to the opposite one at the top
+            foot = x0 + i * step if i % 2 else x0 + (i + 1) * step
+            ob = box(f"{name}Diag{side}_{i}", 0.22, 0.22, diag, (foot, yy, deck_z + 0.4), steel)
+            ob.rotation_euler = (0, lean, 0)
+    for i, px in enumerate((x0 + length / 3, x0 + 2 * length / 3)):
+        box(f"{name}Pier{i}", 3.0, 7.0, deck_z + 1.5, (px, y, -1.5), deck_mat)
+    for i in range(panels * 2 + 1):
+        lx = x0 + i * length / (panels * 2)
+        sphere(f"{name}Lamp{i}", 0.3, (lx, y - 3.1, deck_z + depth + 0.6), lamp, subdiv=1)
 
 
 def chiang_mai():
-    """The Ping river in Chiang Mai looking upstream to a lit road bridge hung with Yi Peng
-    lanterns, Lanna houses and restaurants on both banks, Doi Suthep on the left with the
-    temple lights near its summit."""
+    """The Ping river in Chiang Mai on Yi Peng night, looking upstream past riverside Lanna
+    houses to the Iron Bridge hung with lanterns. Doi Suthep rises in layers behind the
+    city, the road up to Wat Phra That a thread of lights to the gold chedi near the top,
+    and the sky is full of khom loi lanterns drifting up from the bridge."""
     lens(40)
-    world(top=(0.004, 0.007, 0.02), horizon=(0.03, 0.032, 0.07), glow=(1.0, 0.55, 0.25), glow_amt=0.2)
+    world(top=(0.004, 0.006, 0.02), horizon=(0.05, 0.04, 0.07), glow=(1.0, 0.55, 0.25), glow_amt=0.3)
     moon(-0.111, 0.356)
-    mountain = mat("Mountain", (0.012, 0.016, 0.03), rough=1, emit=(0.06, 0.08, 0.16), strength=0.35)
-    bm2 = bmesh.new()
-    pts = []
-    for i in range(61):
-        u = -1 + 2 * i / 60
-        h = (math.cos((u + 0.35) * 2.2) * 0.6 + 0.4) * 520 + 30 * math.sin(u * 9)
-        pts.append((u * 4000, max(h, 5)))
-    verts_top = [bm2.verts.new((x, 0, z)) for x, z in pts]
-    verts_bot = [bm2.verts.new((x, 0, 0)) for x, _ in pts]
-    for i in range(60):
-        bm2.faces.new((verts_bot[i], verts_bot[i + 1], verts_top[i + 1], verts_top[i]))
-    mesh_ob("DoiSuthep", bm2, mountain, loc=(0, 4200, 0))
-    temple = mat("HillTemple", (1, 1, 1), emit=(1, 0.8, 0.4), strength=40)
-    for k in range(5):
-        sphere(f"Phrathat{k}", 3, (-1350 + k * 14, 4190, 470 + (k % 2) * 4), temple, subdiv=1)
+    # Doi Suthep and Doi Pui: two ridges, the far one paler in the haze, peak to the left
+    far = mat("RidgeFar", (0.02, 0.025, 0.045), rough=1, emit=(0.08, 0.09, 0.16), strength=0.5)
+    near = mat("RidgeNear", (0.008, 0.01, 0.02), rough=1, emit=(0.03, 0.035, 0.07), strength=0.35)
+
+    def far_prof(u):
+        return 160 + 420 * math.exp(-((u - 0.3) / 0.22) ** 2) + 25 * math.sin(u * 23) + 12 * math.sin(u * 61 + 1)
+
+    def near_prof(u):
+        return (80 + 300 * math.exp(-((u - 0.36) / 0.18) ** 2) + 90 * math.exp(-((u - 0.75) / 0.12) ** 2)
+                + 14 * math.sin(u * 37) + 6 * math.sin(u * 97 + 2))
+
+    ridge("DoiPui", 6200, -5200, 5200, far_prof, far)
+    _, tops = ridge("DoiSuthep", 4300, -3600, 3600, near_prof, near)
+    # the gold chedi just below the summit and the road climbing to it
+    px, pz = max(tops, key=lambda t: t[1])
+    sx, sz = px - 160, pz - 38
+    gold = mat("PhraThat", (1, 1, 1), emit=(1.0, 0.78, 0.38), strength=60)
+    lathe("PhraThatChedi", [(12, 0), (12, 7), (8, 17), (2.0, 34), (0, 44)], (sx, 4290, sz), gold, segments=10)
+    sphere("PhraThatGlow", 32, (sx, 4300, sz + 10), mat("PhraThatHaze", (1, 1, 1), emit=(1.0, 0.7, 0.35), strength=1.2))
+    road = mat("RoadLight", (1, 1, 1), emit=(1.0, 0.8, 0.5), strength=14)
+    x, z = 600.0, 8.0
+    k = 0
+    rnd_road = random.Random(30)
+    while z < sz - 4 and k < 600:
+        # switchbacks: the road swings left and right as it climbs toward the temple
+        tx = sx + (math.sin(k * 0.06) + 0.35 * math.sin(k * 0.23 + 1)) * 300 * (1 - z / sz)
+        x += (tx - x) * 0.08
+        z += sz / 300
+        if k % 4 == 0 and rnd_road.random() < 0.7:  # street lamps, some out
+            sphere(f"Road{k}", 2.4, (x, 4280, z), road, subdiv=1)
+        k += 1
+    # the city at the foot of the hills: a wide band of lights
+    rnd = random.Random(31)
+    for i in range(380):
+        yy = rnd.uniform(1500, 3800)
+        half = view_half_width(yy)
+        c = rnd.choice(((1.0, 0.75, 0.42), (1.0, 0.85, 0.65), (0.8, 0.9, 1.0)))
+        sphere(f"City{i}", rnd.uniform(0.8, 2.0), (rnd.uniform(-half, half), yy, rnd.uniform(1, 18)),
+               mat(f"CityLight{c}", (1, 1, 1), emit=c, strength=30), subdiv=1)
     # the two banks run away from the camera toward the bridge
     bank = mat("Bank", (0.01, 0.012, 0.02), rough=0.9)
     for side in (-1, 1):
         bm = bmesh.new()
-        v = [bm.verts.new(p) for p in ((side * 60, 20, 0.8), (side * 600, 20, 0.8), (side * 600, 700, 0.8), (side * 60, 700, 0.8))]
+        v = [bm.verts.new(p) for p in ((side * 60, 20, 0.8), (side * 600, 20, 0.8), (side * 600, 900, 0.8), (side * 60, 900, 0.8))]
         bm.faces.new(v if side > 0 else list(reversed(v)))
         mesh_ob(f"Bank{side}", bm, bank)
-    box("FarBank", 1400, 2000, 0.8, (0, 700 + 1000, 0), bank)
-    stone = mat("BridgeStone", (0.18, 0.16, 0.14), rough=0.7, emit=(1.0, 0.75, 0.45), strength=0.45)
+    box("FarBank", 1400, 2000, 0.8, (0, 900 + 1000, 0), bank)
+    steel = mat("IronBridge", (0.12, 0.14, 0.16), rough=0.5, metallic=0.6, emit=(1.0, 0.75, 0.45), strength=0.35)
+    deck = mat("BridgeDeck", (0.18, 0.16, 0.14), rough=0.7, emit=(1.0, 0.75, 0.45), strength=0.3)
     lamp = mat("BridgeLamp", (1, 1, 1), emit=(1.0, 0.8, 0.5), strength=30)
-    arch_bridge("Nawarat", 330, -64, 64, 9, 3, stone, lamp)
-    colors = [(1.0, 0.7, 0.3), (1.0, 0.3, 0.3), (1.0, 0.85, 0.6), (1.0, 0.45, 0.6)]
-    for row in range(2):
-        for i in range(40):
-            u = i / 39
-            x = -60 + u * 120
-            z = 13.5 + row * 1.6 - math.sin((u * 4 % 1) * math.pi) * 1.4
-            c = colors[(i + row) % 4]
-            sphere(f"Yipeng{row}_{i}", 0.5, (x, 322 - row, z),
-                   mat(f"Yp{(i + row) % 4}", (1, 1, 1), emit=c, strength=20), scale=(1, 1, 1.3), subdiv=1)
+    truss_bridge("SaphanLek", 330, -64, 64, 6, 6.5, 12, steel, deck, lamp)
+    yipeng = [(1.0, 0.62, 0.22), (1.0, 0.3, 0.25), (1.0, 0.82, 0.5), (1.0, 0.4, 0.55)]
+    for side, yy in ((-1, 327), (1, 333)):
+        lantern_string(f"BridgeKhom{side}", [(-64 + i * 16, yy, 12.9) for i in range(9)], yipeng, per=6, size=0.55)
     wood = mat("Teak", (0.05, 0.03, 0.02), rough=0.8, emit=(1.0, 0.6, 0.3), strength=0.12)
     roof = mat("LannaRoof", (0.02, 0.016, 0.014), rough=0.7)
     lit = mat("HouseWindow", (1, 1, 1), emit=(1.0, 0.72, 0.4), strength=8)
@@ -1134,16 +1348,20 @@ def chiang_mai():
             yy = 70 + k * 30
             xx = side * (70 + rnd.uniform(0, 5))
             lanna_house(f"House{side}_{k}", xx, yy, 14 + rnd.uniform(-2, 4), wood, roof, lit)
+        # lantern lines strung along the riverside restaurants
+        lantern_string(f"BankKhom{side}", [(side * 61, 30 + i * 28, 4.2) for i in range(11)], yipeng, per=5, size=0.42)
+        for i in range(11):
+            lathe(f"BankPost{side}_{i}", [(0.12, 0), (0.1, 4.4)], (side * 61, 30 + i * 28, 0.8), wood, segments=6)
     trees = mat("Trees", (0.008, 0.012, 0.01), rough=0.9)
     tree_cluster(12, -420, -170, 420, 40, trees, h=(10, 20), spread=140)
     tree_cluster(13, 170, 420, 420, 40, trees, h=(10, 20), spread=140)
-    tree_cluster(14, -200, 200, 420, 30, trees, h=(10, 18), spread=40)
+    tree_cluster(14, -200, 200, 470, 30, trees, h=(10, 18), spread=40)
     point("BridgeGlow", (0, 300, 12), 30000, (1.0, 0.6, 0.35), radius=12)
-    for side in (-1, 1):
-        lamp_row(20 + side, side * 82, side * 82, 0, 1.5, 1, (1.0, 0.75, 0.4))
-    crowd(42, -60, 60, 323, 40, spread=1.5, crouch_share=0.0)
+    crowd(42, -60, 60, 330, 40, spread=1.5, crouch_share=0.0)
     for side in (-1, 1):
         crowd(43 + side, side * 62, side * 64, 200, 40, spread=120, crouch_share=0.5)
+    distant_krathongs(44, 70, 110, 320, max_x=55)
+    sky_lanterns(45, 260, 260, 2600, source_x=-40, spread=0.45)
 
 
 def roi_et():
@@ -1198,6 +1416,7 @@ def roi_et():
     lamp_row(17, -260, 260, y + 1.5, 1.0, 110, (1.0, 0.72, 0.35), strength=45, size=0.28)
     point("ShoreGlow", (0, y + 5, 4), 12500, (1.0, 0.65, 0.35), radius=10)
     crowd(51, -200, 200, y + 3, 70, spread=2)
+    distant_krathongs(72, 60, 120, y - 6)
 
 
 def ellipse_pts(cx, cy, rx, ry, n=96):
