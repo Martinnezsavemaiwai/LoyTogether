@@ -296,6 +296,90 @@ def folded_leaf_bm(w, h, depth):
     return bm
 
 
+def folded_leaf2_bm(w, h, depth, cols=5, rows=9, bow=0.12):
+    """Banana leaf folded into a pointed petal, built as two curved leaf faces that meet on a
+    crisp ridge: the faces bow out a little between ridge and edge, the ridge itself curves
+    from the root up to the tip, and the lower edges sweep back. Sharp only along the fold."""
+    bm = bmesh.new()
+
+    def ridge(v):  # quadratic curve root -> bulge -> tip
+        a, c, b = Vector((0, depth * 0.55, 0)), Vector((0, depth * 1.25, h * 0.42)), Vector((0, depth * 0.12, h))
+        return a * (1 - v) ** 2 + c * 2 * v * (1 - v) + b * v * v
+
+    grid = {}
+    for side in (-1, 1):
+        for i in range(rows + 1):
+            v = i / rows
+            rp = ridge(v)
+            half = w / 2 * (1 - v) ** 0.85
+            for j in range(cols + 1):
+                u = j / cols
+                if j == 0 and side == 1:
+                    grid[(side, i, j)] = grid[(-1, i, 0)]  # ridge shared by both faces
+                    continue
+                x = side * half * u
+                k = 1 - v  # everything converges on the ridge at the tip
+                y = rp.y * (1 - u * k) + math.sin(math.pi * u) * bow * w * k - u * u * depth * 0.15 * k
+                z = rp.z * (1 - u * 0.12 * k) + u * u * h * 0.03 * k
+                grid[(side, i, j)] = bm.verts.new((x, y, z))
+    for side in (-1, 1):
+        for i in range(rows):
+            for j in range(cols):
+                q = (grid[(side, i, j)], grid[(side, i, j + 1)], grid[(side, i + 1, j + 1)], grid[(side, i + 1, j)])
+                bm.faces.new(q if side == 1 else tuple(reversed(q)))
+    bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=1e-7)  # the tip row collapses to a point
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    for e in bm.edges:  # the fold line stays crisp, the leaf faces shade smooth
+        if all(abs(vv.co.x) < 1e-6 for vv in e.verts):
+            e.smooth = False
+    bmesh.ops.solidify(bm, geom=bm.faces[:], thickness=0.0008)
+    return bm
+
+
+def leaf_vein_mat(name, color, light):
+    """Folded banana leaf: veins run across the leaf, so on a fold they meet the ridge in a
+    chevron; the colour lightens a little along each vein and toward the folded edge."""
+    if name in _mats:
+        return _mats[name]
+    m = principled(name, color, rough=0.32, sss=0.12, coat=0.25)
+    nt = m.node_tree
+    b = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
+    b.inputs["Coat Roughness"].default_value = 0.25
+    coord = nt.nodes.new("ShaderNodeTexCoord")
+    sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+    nt.links.new(coord.outputs["Object"], sep.inputs["Vector"])
+    ax = nt.nodes.new("ShaderNodeMath")
+    ax.operation = "ABSOLUTE"
+    nt.links.new(sep.outputs["X"], ax.inputs[0])
+    chev = nt.nodes.new("ShaderNodeMath")
+    chev.operation = "MULTIPLY_ADD"  # |x| * 0.8 + z
+    chev.inputs[1].default_value = 0.8
+    nt.links.new(ax.outputs[0], chev.inputs[0])
+    nt.links.new(sep.outputs["Z"], chev.inputs[2])
+    freq = nt.nodes.new("ShaderNodeMath")
+    freq.operation = "MULTIPLY"
+    freq.inputs[1].default_value = 2600.0  # about one vein per 2.4 mm
+    nt.links.new(chev.outputs[0], freq.inputs[0])
+    sine = nt.nodes.new("ShaderNodeMath")
+    sine.operation = "SINE"
+    nt.links.new(freq.outputs[0], sine.inputs[0])
+    bump = nt.nodes.new("ShaderNodeBump")
+    bump.inputs["Strength"].default_value = 0.18
+    nt.links.new(sine.outputs[0], bump.inputs["Height"])
+    nt.links.new(bump.outputs["Normal"], b.inputs["Normal"])
+    edge = nt.nodes.new("ShaderNodeMapRange")  # paler toward the folded-over edges
+    edge.inputs["From Min"].default_value = 0.004
+    edge.inputs["From Max"].default_value = 0.022
+    nt.links.new(ax.outputs[0], edge.inputs["Value"])
+    mix = nt.nodes.new("ShaderNodeMix")
+    mix.data_type = "RGBA"
+    mix.inputs[6].default_value = (*color, 1)
+    mix.inputs[7].default_value = (*light, 1)
+    nt.links.new(edge.outputs["Result"], mix.inputs[0])
+    nt.links.new(mix.outputs[2], b.inputs["Base Color"])
+    return m
+
+
 def rolled_leaf_bm(r0, h, turns=1.6, seg=28, rows=4, thick=0.0008, flare=0.0):
     """Banana leaf rolled into a rosebud (กลีบกุหลาบ): a spiral sheet, outer turns taller."""
     bm = bmesh.new()
@@ -532,14 +616,20 @@ def base_banana(shape, coll, rose=False):
     # leaf folded into pointed petals (กลีบแหลม), three rows overlapping like scales,
     # each pinned at the root as a real one is
     rows = ((18, 0.93, 0.046, 0.046, -0.42), (18, 0.85, 0.04, 0.04, -0.3), (16, 0.75, 0.034, 0.034, -0.18))
+    fold_mats = (leaf_vein_mat("FoldDark", (0.018, 0.1, 0.022), (0.05, 0.2, 0.05)),
+                 leaf_vein_mat("FoldLight", (0.04, 0.19, 0.04), (0.1, 0.32, 0.08)),
+                 leaf_vein_mat("FoldDark", (0.018, 0.1, 0.022), (0.05, 0.2, 0.05)))
+    under = leaf_vein_mat("FoldUnder", (0.12, 0.3, 0.09), (0.2, 0.42, 0.14))  # pale underside of the leaf
     for row, (n, scale, w, h, tilt) in enumerate(rows):
         pts = shape_outline(shape, n * 2)
         for i in range(n):
             x, y = pts[(i * 2 + row % 2) % (n * 2)]
             px, py = x * R * scale, y * R * scale
-            mat = (dark, light, dark)[row]
-            fold = obj(f"Fold{row}_{i}_{shape}", folded_leaf_bm(w, h, depth=0.011), mat, coll,
-                       loc=(px, py, 0.012 + row * 0.004), rot=outward_rot(x, y, tilt), smooth=False)
+            fold = obj(f"Fold{row}_{i}_{shape}", folded_leaf2_bm(w, h, depth=0.011), fold_mats[row], coll,
+                       loc=(px, py, 0.012 + row * 0.004), rot=outward_rot(x, y, tilt))
+            # the leaf is folded double: its paler underside shows as a band under each edge
+            obj(f"FoldBack{row}_{i}_{shape}", folded_leaf2_bm(w * 1.08, h * 0.86, depth=0.009), under, coll,
+                loc=(px - x * 0.0025, py - y * 0.0025, 0.0115 + row * 0.004), rot=outward_rot(x, y, tilt))
             if row < 2:
                 # the pin goes through the lower fold, on the line from the root up the ridge
                 bpy.context.view_layer.update()
@@ -616,36 +706,74 @@ def base_trunk(shape, coll):
         ring.modifiers["Bevel"].segments = 2
 
 
-def base_ice(shape, coll):
-    """Clear ice disc with petals frozen inside (กระทงน้ำแข็ง)."""
-    ice = principled("Ice", (0.85, 0.95, 1.0), rough=0.06, transmission=1.0, ior=1.31)
-    nt = ice.node_tree
+def ice_mat():
+    """Clear ice, faintly blue, glossy where it is wet and a touch frosted elsewhere."""
+    if "Ice2" in _mats:
+        return _mats["Ice2"]
+    m = principled("Ice2", (0.86, 0.95, 1.0), rough=0.05, transmission=1.0, ior=1.31)
+    nt = m.node_tree
     b = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
-    nz = nt.nodes.new("ShaderNodeTexNoise")
-    nz.inputs["Scale"].default_value = 40
+    frost = nt.nodes.new("ShaderNodeTexNoise")
+    frost.inputs["Scale"].default_value = 160
+    frost.inputs["Detail"].default_value = 6
+    rough = nt.nodes.new("ShaderNodeMapRange")
+    rough.inputs["From Min"].default_value = 0.45
+    rough.inputs["From Max"].default_value = 0.75
+    rough.inputs["To Min"].default_value = 0.02
+    rough.inputs["To Max"].default_value = 0.1
+    nt.links.new(frost.outputs["Fac"], rough.inputs["Value"])
+    nt.links.new(rough.outputs["Result"], b.inputs["Roughness"])
+    melt = nt.nodes.new("ShaderNodeTexNoise")
+    melt.inputs["Scale"].default_value = 45
     bump = nt.nodes.new("ShaderNodeBump")
-    bump.inputs["Strength"].default_value = 0.15
-    nt.links.new(nz.outputs["Fac"], bump.inputs["Height"])
+    bump.inputs["Strength"].default_value = 0.12
+    nt.links.new(melt.outputs["Fac"], bump.inputs["Height"])
     nt.links.new(bump.outputs["Normal"], b.inputs["Normal"])
-    ob = slab(f"Ice_{shape}", shape, R, 0.0, 0.05, ice, coll)
-    ob.modifiers["Bevel"].width = 0.008
-    ob.modifiers["Bevel"].segments = 4
+    _mats["Ice2"] = m
+    return m
+
+
+def base_ice(shape, coll):
+    """A block of clear ice with flowers frozen inside (กระทงน้ำแข็ง): the edges rounded where
+    they have started to melt, strings of tiny bubbles caught on their way up. Top = 0.05."""
+    ob = slab(f"Ice_{shape}", shape, R, 0.0, 0.05, ice_mat(), coll)
+    ob.modifiers["Bevel"].width = 0.009
+    ob.modifiers["Bevel"].segments = 5
     rnd = random.Random(5)
-    frozen = [principled("FrozenPink", (0.9, 0.3, 0.5), rough=0.5, sss=0.3),
-              principled("FrozenYellow", (0.95, 0.65, 0.1), rough=0.5, sss=0.3),
-              principled("FrozenWhite", (0.95, 0.95, 0.95), rough=0.5, sss=0.3)]
-    for i in range(26):
-        a = rnd.uniform(0, math.pi * 2)
-        r = R * rnd.uniform(0.15, 0.8)
-        bm = petal_bm(0.02, 0.014, cup=0.3)
-        obj(f"Frozen{i}_{shape}", bm, frozen[i % 3], coll, loc=(math.sin(a) * r, math.cos(a) * r, rnd.uniform(0.012, 0.035)),
-            rot=(rnd.uniform(-0.8, 0.8), rnd.uniform(-0.8, 0.8), rnd.uniform(0, 6.28)))
+    # whole flowers frozen at different depths, and loose petals between them
+    for i, (kind, ang, rad, z, s) in enumerate((("marigold", 0.4, 0.5, 0.02, 1.15), ("rose", 2.0, 0.52, 0.022, 1.1),
+                                               ("orchid", 3.6, 0.5, 0.024, 1.0), ("jasmine", 4.6, 0.55, 0.026, 1.0),
+                                               ("rose", 5.5, 0.4, 0.02, 0.95))):
+        flower(kind, f"Frozen{kind}{i}_{shape}", coll, (math.sin(ang) * R * rad, math.cos(ang) * R * rad, z), s=s)
+    petal_mats = [gradient_mat("FrozenPink2", (0.96, 0.75, 0.82), (0.86, 0.22, 0.46), rough=0.45, sss=0.2),
+                  gradient_mat("FrozenYellow2", (0.98, 0.7, 0.1), (1.0, 0.5, 0.0), rough=0.45, sss=0.2),
+                  gradient_mat("FrozenRed2", (0.4, 0.0, 0.03), (0.7, 0.02, 0.07), rough=0.45, sss=0.2)]
+    for i in range(30):
+        a = rnd.uniform(0, math.tau)
+        r = R * rnd.uniform(0.2, 0.85)
+        bm = petal2_bm(0.018, 0.014, cup=0.5, curl=rnd.uniform(0.1, 0.6), point=0.2, seg=8, cols=4, taper=1.0)
+        obj(f"FrozenPetal{i}_{shape}", bm, petal_mats[i % 3], coll,
+            loc=(math.sin(a) * r, math.cos(a) * r, rnd.uniform(0.008, 0.04)),
+            rot=(rnd.uniform(-0.9, 0.9), rnd.uniform(-0.9, 0.9), rnd.uniform(0, math.tau)))
+    # bubbles: a few loose, most in thin rising strings
     bubble = principled("Bubble", (1, 1, 1), rough=0.0, transmission=1.0, ior=1.0)
-    for i in range(40):
-        a = rnd.uniform(0, math.pi * 2)
+    k = 0
+    for col in range(9):
+        a = rnd.uniform(0, math.tau)
+        r = R * rnd.uniform(0.2, 0.85)
+        bx, by = math.sin(a) * r, math.cos(a) * r
+        z = rnd.uniform(0.005, 0.012)
+        while z < 0.045:
+            obj(f"Bubble{k}_{shape}", uv_sphere(rnd.uniform(0.0004, 0.0009), 8, 6), bubble, coll,
+                loc=(bx + rnd.uniform(-0.0006, 0.0006), by + rnd.uniform(-0.0006, 0.0006), z))
+            z += rnd.uniform(0.0025, 0.0045)
+            k += 1
+    for i in range(24):
+        a = rnd.uniform(0, math.tau)
         r = R * rnd.uniform(0, 0.9)
-        obj(f"Bubble{i}_{shape}", uv_sphere(rnd.uniform(0.0008, 0.002), 8, 6), bubble, coll,
+        obj(f"Bubble{k}_{shape}", uv_sphere(rnd.uniform(0.0008, 0.0022), 8, 6), bubble, coll,
             loc=(math.sin(a) * r, math.cos(a) * r, rnd.uniform(0.006, 0.044)))
+        k += 1
 
 
 def split_front_rim(coll, front):
