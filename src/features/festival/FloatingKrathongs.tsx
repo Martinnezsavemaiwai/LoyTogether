@@ -95,7 +95,10 @@ const FloatingItem = memo(function FloatingItem({
           type="button"
           onClick={() => onSelect?.(krathong)}
           className="pointer-events-auto block cursor-pointer rounded-2xl p-1 transition-transform duration-300 hover:scale-105 focus-visible:scale-105"
-          aria-label={isMine ? `กระทงของคุณ (${krathong.displayName})` : `กระทงของ ${krathong.displayName}`}
+          // The floating wish bubble is decorative, so a public wish is read out with the krathong.
+          aria-label={`${isMine ? `กระทงของคุณ (${krathong.displayName})` : `กระทงของ ${krathong.displayName}`}${
+            krathong.publicWish ? ` คำอธิษฐาน: ${krathong.publicWish}` : ''
+          }`}
         >
           {body}
         </button>

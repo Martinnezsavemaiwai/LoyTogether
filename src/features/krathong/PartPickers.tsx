@@ -174,7 +174,7 @@ export function FlowerPicker({
   const hidden = options.length - shown.length;
   return (
     <fieldset>
-      <Legend hint={`เลือกได้ ${MAX_FLOWERS} ชนิด ไม่เลือกก็ได้`}>ดอกไม้</Legend>
+      <Legend hint={`เลือกได้สูงสุด ${MAX_FLOWERS} ชนิด`}>ดอกไม้</Legend>
       <div className="flex flex-wrap gap-2">
         {shown.map((option) => {
           const selected = value.includes(option.value);

@@ -120,8 +120,8 @@ function CoupleMoment({ krathongs }: { krathongs: Krathong[] }) {
   const [dismissed, setDismissed] = useState(false);
   if (owners.length < 2 || dismissed) return null;
   return (
-    <div className="lt-rise absolute inset-x-0 top-[22%] z-[160] mx-auto w-[min(26rem,90%)] rounded-[2rem] border border-gold/40 bg-night/80 p-6 text-center backdrop-blur-md">
-      <Heart className="mx-auto size-7 fill-[#ff8fb1] text-[#ff8fb1]" aria-hidden />
+    <div className="lt-rise absolute inset-x-0 top-[22%] z-[160] mx-auto w-[min(26rem,90%)] rounded-[2rem] border border-violet/45 bg-night/80 p-6 text-center backdrop-blur-md">
+      <Heart className="mx-auto size-7 fill-violet text-violet" aria-hidden />
       <p className="mt-3 text-xl font-semibold text-ink">
         {owners[0]} กับ {owners[1]}
       </p>
@@ -220,10 +220,10 @@ function FestivalView({ roomId, river, room }: { roomId: string; river: River; r
           </Link>
           <div className="min-w-0 pt-0.5">
             <h1 className="flex items-center gap-2 truncate text-lg font-semibold leading-tight sm:text-2xl">
-              {room && (room.roomType === 'couple' ? <Heart className="size-4 shrink-0 text-[#ff8fb1]" aria-label="ห้องคู่" /> : <Lock className="size-4 shrink-0 text-gold" aria-label="ห้องส่วนตัว" />)}
+              {room && (room.roomType === 'couple' ? <Heart className="size-4 shrink-0 fill-violet text-violet" aria-label="ห้องคู่" /> : <Lock className="size-4 shrink-0 text-violet" aria-label="ห้องส่วนตัว" />)}
               <span className="truncate">{title}</span>
             </h1>
-            <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-mist">
+            <p className="mt-1 inline-flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded-2xl bg-night/65 px-3 py-1 text-sm text-ink/80 backdrop-blur-sm">
               {room && <span>{river.name}</span>}
               <span className="inline-flex items-center gap-1">
                 <Users className="size-3.5" aria-hidden />
@@ -284,7 +284,7 @@ function FestivalView({ roomId, river, room }: { roomId: string; river: River; r
       {room?.roomType === 'couple' && <CoupleMoment krathongs={live.krathongs} />}
 
       {/* The gradient band lets taps through to krathongs behind it; only its controls catch them. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[150] flex flex-col items-center gap-1 bg-gradient-to-t from-night/85 to-transparent px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-10 [&>*]:pointer-events-auto">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[150] flex flex-col items-center gap-1 bg-gradient-to-t from-night/85 to-transparent px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-10 [&_button]:pointer-events-auto">
         {backend.mode === 'local' && (
           <p className="mb-2 w-fit max-w-full rounded-2xl bg-night/75 px-4 py-1.5 text-center text-xs text-ink/85 backdrop-blur-sm [text-wrap:balance]">
             โหมดทดลอง ยังไม่ได้ต่อเซิร์ฟเวอร์ กระทงจะเห็นแค่ในเบราว์เซอร์นี้
